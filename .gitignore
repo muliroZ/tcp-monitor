@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+.pytest_cache/
+
+# Dados e resultados ficam fora do Git (guia de implementação)
+data/
+results/
+
+# Locais
+.idea/
+.vscode/
+*.swp

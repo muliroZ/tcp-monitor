@@ -1,0 +1,23 @@
+# Configuração padrão do tcpmon.
+# Todo parâmetro numérico do experimento vem deste arquivo (ou de um arquivo que herda dele via `base`).
+# Nenhum valor numérico do experimento fica fixo no código.
+
+semente: 42
+janela_s: 1.0
+tau_hs_s: 63.0              # sobrescrito pela sysctl lida no laboratório (metadado do pcap)
+rto_inicial_s: 1.0          # RTO inicial do Linux; usado para derivar tau_hs de tcp_synack_retries
+carencia_s: 120.0           # 0 nas capturas de laboratório
+msl_s: 60.0                 # FIN_AMBOS e FECHADO saem da memória após 2*MSL sem pacotes
+ocioso_estabelecido_s: 3600.0
+alfa: 0.01
+camadas: [1, 2, 3]          # [1] = C1, [1, 2] = C2, [1, 2, 3] = C3
+agregador:
+  granularidade: servidor_ip
+  k: null                   # preenchido por tcpmon calibrate (calibration.json)
+  k_scan: null
+  calibracao: null          # caminho de um calibration.json; alternativa a --calibracao
+entrada:
+  pcap: data/lab/teste.pcap
+  rotulos: data/lab/teste_labels.csv
+  metadado: null            # metadado do laboratório (.meta.json); null = procura ao lado do pcap
+saida: results/
