@@ -34,6 +34,152 @@ degenerado em 0 e validação analítica sem conteúdo). A equipe decidiu aplica
 Granularidade do agregador por IP do servidor, α = 0,01 e abertura simultânea indo para
 ⊥ com motivo `ABERTURA_SIMULTANEA`, como proposto no guia.
 
+### D33 — Inclusão entre camadas por traço rejeitado **[equipe]**
+2026-11-25 · fase 5 · decidida · resolve D26
+
+A propriedade formal da hierarquia trata de traços rejeitados, não de alertas idênticos:
+⊥ é absorvente, então rejeitar um prefixo é rejeitar o traço. O critério de inclusão passa a
+ser:
+
+- **C1 ⊆ C2:** para toda instância rejeitada pela C1 existe, na C2, uma instância rejeitada
+  com a mesma chave e o mesmo instante do primeiro pacote, com `t_alerta` menor ou igual
+  ao da C1. O motivo pode ser diferente (ex.: `HANDSHAKE_EXPIRADO` na C2 e
+  `FLAGS_INVALIDAS` na C1). As instâncias são associadas pela chave mais o instante do
+  primeiro pacote, nunca pelo número da instância, que diverge quando um SYN tardio abre
+  uma instância nova só na C2.
+- **C2 ⊆ C3:** continua valendo o teste por alerta idêntico, porque o agregador não remove
+  fluxos.
+- O teste por traço substitui o teste por alerta idêntico no critério de pronto da fase 5.
+  A listagem atual (`tcpmon.eval.inclusao.alertas_ausentes`) vira o relatório de
+  **divergência por janela**: alertas da C1 cuja janela não tem alerta da C2 com chave que
+  case. Esse efeito existe, porque a C2 data o alerta pelo primeiro SYN e a C1 pelo pacote
+  anômalo, e é reportado à parte na avaliação.
+- O artigo enuncia a inclusão sobre traços rejeitados.
+
+### D34 — `handshake_incompleto`: chave por origem e 60 SYNs **[equipe]**
+2026-11-25 · fase 3 · decidida · altera D15 e D19
+
+- A chave de associação do `handshake_incompleto` passa a ser `origem` (IP do atacante,
+  que envia do próprio endereço). Com a chave por servidor, um alerta de tráfego benigno
+  para o mesmo servidor na mesma janela contava como detecção (D19).
+- `n_syn` passa de 20 para 60, com o mesmo espaçamento de 75 s (> τ_hs). O cenário dura
+  cerca de 75 min, e o cenário `teste` cresce na mesma medida. Motivo: com 20 episódios o
+  intervalo de Wilson é largo demais (20/20 dá limite inferior ≈ 0,84).
+- Os episódios continuam pontuais (D15).
+- Consequência: os alertas `AGG_HANDSHAKE_PENDENTE` têm `cliente` vazio e não casam com
+  chave por origem. Na C3, a detecção desse cenário vem do alerta da camada 2 herdado,
+  o que é coerente com a classe (temporal, modelo mínimo AT). A associação compara só o
+  IP da coluna `cliente` (que traz IP:porta).
+- O SYN Flood mantém a chave por servidor: as origens são forjadas e o modelo é por
+  servidor. O guia deve ter a tabela de cenários atualizada.
+
+### D35 — Diagnóstico do T medido no laboratório **[equipe]**
+2026-11-25 · fase 8 · decidida · complementa D2 e D13
+
+O T médio medido (38,7 ms) ficou abaixo dos 50 ms configurados no `netem`. A validação
+analítica não é afetada, porque â e a lei de Little usam o Ê[T] medido. Antes de reportar,
+faz-se um diagnóstico do aparato:
+
+1. Histograma de T dos fluxos benignos da calibração, separado por `motivo_fim_pendente`
+   (conclusão, RST, expiração).
+2. Medição direta do atraso do `netem`: capturar dentro do container cliente e na ponte ao
+   mesmo tempo e comparar os instantes de cada pacote.
+3. Verificar o efeito do corte de atrasos negativos da normal e da fila `pfifo` sobre a
+   distribuição efetiva.
+
+Se a causa for erro de medição no código, ele é corrigido e registrado. Se for
+comportamento do `netem` ou do kernel, o artigo reporta o atraso efetivo medido, com a
+causa. Em nenhum caso os parâmetros do `netem` são mudados para que T chegue a 50 ms.
+
+### D36 — Servidores monitorados e k por servidor **[equipe]**
+2026-11-25 · fase 6 · decidida · resolve D28 e substitui D31
+
+- Nova chave `agregador.servidores`: lista de IPs monitorados pelo detector de handshakes
+  pendentes, definida **antes** de qualquer execução sobre o teste e gravada em `run.json`.
+  - Laboratório: o servidor HTTP.
+  - CIC-IDS2017 e CIC-DDoS2019: os servidores internos da rede vítima, conforme a
+    documentação de cada dataset (lista a preencher pela equipe depois da conferência na
+    página da UNB; ver D37).
+- Retratos só para os servidores da lista, inclusive com N_s = 0.
+- **k por servidor:** k_s empírico = menor inteiro tal que a fração de retratos do
+  servidor s com N_s > k seja ≤ α. O k analítico também é por servidor, com â_s. A média
+  ponderada da D31 deixa de ser usada. `calibration.json` grava um k por servidor.
+- Motivo: juntar servidores com taxas muito diferentes forma uma mistura de Poissons
+  (dispersão > 1) e deixa o servidor mais movimentado com P_FA bem acima de α.
+- A P_FA é reportada por servidor e agregada. As ROC são por servidor.
+- Servidores fora da lista não geram alerta do agregador (limitação declarada).
+
+### D37 — Escopo dos datasets reais **[equipe]**
+2026-11-25 · fase 9 · decidida
+
+- **CIC-IDS2017** para as classes estruturais e temporais (varreduras com flags inválidas,
+  handshakes) e como tráfego realista para as três configurações.
+- **CIC-DDoS2019**, no dia que contém SYN Flood, para a camada 3 e a validação analítica em
+  tráfego real.
+- Motivo: até onde a equipe sabe, o CIC-IDS2017 não tem SYN Flood (os DoS são de
+  aplicação, o DDoS é LOIC HTTP e o PortScan é vertical, contra um único host).
+- **A conferir na página oficial da UNB antes de implementar** (as afirmações acima vieram
+  de memória): lista de ataques e horários de cada dia, IPs e sistemas operacionais das
+  vítimas, IP do atacante visto na captura interna (provavelmente o endereço do NAT) e qual
+  dia do CIC-DDoS2019 contém SYN Flood.
+- Pendência nova: definir o conjunto de calibração do CIC-DDoS2019, que não tem, até onde
+  se sabe, um dia só benigno.
+- O critério de pronto da fase 9 passa a ser: o pipeline completo roda sobre um dia de cada
+  dataset.
+
+### D38 — Rótulos do CIC-IDS2017 pela agenda oficial **[equipe]**
+2026-11-25 · fase 9 · decidida
+
+- Os episódios vêm da agenda oficial de ataques publicada pela UNB (ataque, início, fim,
+  atacante, vítima), convertida para `labels.csv`.
+- Fuso: a agenda está no horário local de New Brunswick (ADT, UTC−3); converte-se para
+  epoch UTC, a mesma base dos timestamps do pcap.
+- `chave_tipo` segue a regra do laboratório: `origem` para classes de sequência, flags e
+  varredura; `servidor` para classes volumétricas contra um alvo.
+- **Tolerância de ±60 s:** as janelas em `[t_inicio − 60, t_inicio)` e
+  `(t_fim, t_fim + 60]` não são positivas nem benignas, como a zona de transição. Seus
+  alertas são reportados à parte. Sensibilidade com 0, 60 e 300 s.
+- Os CSVs por fluxo (CICFlowMeter) não definem rótulos; servem só de auditoria. Problemas
+  conhecidos (Engelen et al., 2021; Lanvin et al., 2022) são registrados, nunca corrigidos
+  no dado (regra 7). Escolher a fonte oficial dos rótulos é regra de conversão, não
+  alteração do dado.
+- O CIC-DDoS2019 usa a mesma regra, com o fuso e a agenda da sua própria documentação.
+
+### D39 — τ_hs nos datasets reais **[equipe]**
+2026-11-25 · fase 9 · decidida
+
+- τ_hs = 63 s para todos os servidores, justificado pelo sistema operacional dos alvos
+  (Linux com padrões: `tcp_synack_retries = 5`, RTO inicial de 1 s), a confirmar na
+  documentação (D37).
+- Análise de sensibilidade com o valor padrão do Windows Server, tirado de fonte oficial
+  da Microsoft.
+- `run.json` grava τ_hs com origem `documentacao_dataset`.
+
+### D40 — Calibração do CIC-IDS2017 na segunda-feira **[equipe]**
+2026-11-25 · fase 9 · decidida
+
+A calibração usa o dia só benigno (segunda-feira, 3 de julho de 2017), com G = 120 s. Os
+demais dias são teste. Nada medido no teste volta para a escolha de parâmetros.
+
+### D41 — Baselines Zeek e Suricata entram no artigo **[equipe]**
+2026-11-25 · fase 10 · decidida
+
+- Os dois rodam sobre os mesmos pcaps, e os logs são convertidos para o esquema de
+  `alerts.csv`.
+- Enquadramento de complementaridade, não de competição: cobertura complementar, latência,
+  falsos alarmes em tráfego benigno e custo computacional.
+- Versões exatas de Zeek e Suricata e a data do conjunto de regras (ET Open) ficam fixadas
+  e gravadas em `run.json`.
+- A conversão (`conn_state` do Zeek, como S0, REJ e SH, e as assinaturas do Suricata para as
+  classes de anomalia) é registrada aqui, item por item, antes da execução.
+
+### Pendências que continuam com a equipe
+
+- Conferir na página da UNB os fatos listados na D37 e preencher `agregador.servidores`.
+- Baixar os pcaps do CIC-IDS2017 (segunda-feira e dias de ataque) e do dia de SYN Flood do
+  CIC-DDoS2019. A equipe ainda não os tem.
+- Definir a calibração do CIC-DDoS2019 (D37).
+
 ---
 
 ## Decisões de implementação (aguardando revisão)
@@ -111,7 +257,7 @@ não os mostraria. Os containers do Docker vêm com `ip_forward = 1`; por isso o
 recebe a sysctl explicitamente.
 
 ### D13 — `netem` sem reordenação
-2026-11-25 · fase 3 · aberta
+2026-11-25 · fase 3 · decidida (D35)
 
 O `netem` com *jitter* reordena pacotes por padrão. Foi adicionada uma fila `pfifo` filha
 (`limit 1000`): o atraso varia, mas a ordem é preservada. Motivo: a decisão D2 pediu
@@ -126,7 +272,7 @@ aceitar conexões (o kernel completa o handshake). O atacante não bloqueia RST 
 o kernel dele reseta cada SYN-ACK, como numa varredura SYN real.
 
 ### D15 — Estrutura dos episódios
-2026-11-25 · fase 3 · aberta
+2026-11-25 · fase 3 · decidida, alterada pela D34
 
 Valores em `lab/scenarios/*.yaml`:
 
@@ -168,7 +314,7 @@ inspeção manual. O guia usa `--cenario/--semente` numa tabela e `--scenario/--
 os dois pares são aceitos.
 
 ### D19 — Chave de associação do handshake incompleto
-2026-11-25 · fase 3 · aberta
+2026-11-25 · fase 3 · decidida, alterada pela D34
 
 Seguindo o guia, a chave do `handshake_incompleto` é o servidor alvo. Consequência: um alerta
 de tráfego benigno para o mesmo servidor, na mesma janela, também conta como detecção.
@@ -223,8 +369,8 @@ Além das colunas do guia: `t_primeiro_syn`, `t_fim_pendente` e `motivo_fim_pend
 (`rejeicao`, `inatividade`, `reuso_de_porta`, `syn_em_midstream`, `fim_da_captura`) e
 `motivo_alerta`.
 
-### D26 — Exceção teórica à inclusão C1 ⊆ C2 (levar à equipe)
-2026-11-25 · fase 5 · aberta
+### D26 — Exceção teórica à inclusão C1 ⊆ C2
+2026-11-25 · fase 5 · decidida (D33)
 
 Seguindo o guia, um fluxo que expira na camada 2 vai para ⊥, é removido e vira lápide. Na
 C1 o mesmo fluxo continua vivo (sem prazo). Se, **depois** de τ_hs, chegar a essa chave um
@@ -244,7 +390,7 @@ mesmo alerta da transição temporizada e o contador `guarda_temporal_violada` r
 ocorrido (esperado: 0).
 
 ### D28 — Conjunto de servidores dos retratos
-2026-11-25 · fase 6 · aberta
+2026-11-25 · fase 6 · decidida (D36)
 
 A cada fim de janela tira-se um retrato de N_s para todo servidor (IP) que já recebeu ao
 menos um SYN de abertura desde o início da captura, inclusive com N_s = 0. A janela final
@@ -268,7 +414,7 @@ A contagem de varredura considera toda instância de fluxo nova entregue aos mon
 servidor) e contando IPs de servidor distintos. Não se restringe a fluxos abertos com SYN.
 
 ### D31 — Estimativa de â e k analítico com vários servidores
-2026-11-25 · fase 6 · aberta
+2026-11-25 · fase 6 · substituída pela D36
 
 λ̂_L por servidor = instâncias com primeiro `C.SYN` para o servidor ÷ (último timestamp − t0);
 Ê[T] também é estimado por servidor (fluxos `truncado` fora; expirados entram com T = τ_hs).
@@ -284,7 +430,10 @@ benigno, e as duas formas coincidem.
 decisão). A pasta da calibração (`results/.../<run_id>-calib/`) guarda `flows.csv`,
 `snapshots.csv`, `varredura.csv` e `calibration.json`.
 
-### D33 — Janela positiva × zona de transição
+> D42–D50 são as decisões de implementação das fases 7 e 8, renumeradas porque os números
+> D33–D41 passaram a identificar decisões da equipe.
+
+### D42 — Janela positiva × zona de transição
 2026-11-25 · fase 7 · aberta
 
 Lido ao pé da letra, "janelas que intersectam `[t_fim, t_fim + τ_hs]`" incluiria a própria
@@ -294,7 +443,7 @@ intersectam `[t_fim, t_fim + τ_hs]`. Uma janela positiva para qualquer episódi
 transição; benignas são as que não são nem uma coisa nem outra. A zona de transição vale para
 todas as classes.
 
-### D34 — Latência
+### D43 — Latência
 2026-11-25 · fase 7 · aberta
 
 Latência do episódio = `t_alerta` do primeiro alerta que casa com ele (mesma chave e janela
@@ -303,7 +452,7 @@ p95 por configuração e classe, mais a latência de cada episódio em `episodio
 documento de pesquisa também cita latência em pacotes; o guia define em tempo, e é o que se
 mede.
 
-### D35 — Precisão, F1 e falso alarme
+### D44 — Precisão, F1 e falso alarme
 2026-11-25 · fase 7 · aberta
 
 FP e TN são contados nas janelas benignas, com qualquer alerta de qualquer camada; por isso
@@ -311,7 +460,7 @@ P_FA é a mesma para todas as classes de uma configuração. Precisão por class
 TP_classe / (TP_classe + FP). `falsos_alarmes.csv` detalha os motivos dos alertas em janelas
 benignas e `transicao.csv` os alertas nas zonas de transição.
 
-### D36 — McNemar e diferença de P_D
+### D45 — McNemar e diferença de P_D
 2026-11-25 · fase 7 · aberta
 
 Pares C1×C2, C2×C3 e C1×C3, por classe, sobre as janelas positivas da classe. Exato
@@ -320,13 +469,13 @@ Holm sobre todos os testes da avaliação. A diferença reportada é P_D(B) − 
 Newcombe para dados pareados (método 10, intervalos de Wilson e φ corrigido), conferido
 contra a tabela de referência 20/12/2/16 (IC 0,056156 a 0,329207).
 
-### D37 — Alertas fora das janelas completas
+### D46 — Alertas fora das janelas completas
 2026-11-25 · fase 7 · aberta
 
 Alertas cuja janela é a final incompleta não entram nas métricas; a quantidade aparece em
 `desempenho.csv` (`alertas_fora_das_janelas_completas`).
 
-### D38 — Testes de aderência à Poisson
+### D47 — Testes de aderência à Poisson
 2026-11-25 · fase 8 · aberta
 
 Qui-quadrado dos retratos benignos da calibração contra Poisson(â), com a última classe
@@ -335,7 +484,7 @@ cauda para a cabeça e depois no meio). Como â vem da mesma calibração, gl = 
 KS dos intervalos entre primeiros SYNs benignos contra a exponencial com média estimada dos
 próprios dados: o valor-p é aproximado (registrado no `analytic.json`).
 
-### D39 — População dos pontos empíricos da ROC
+### D48 — População dos pontos empíricos da ROC
 2026-11-25 · fase 8 · aberta
 
 Para cada episódio de SYN Flood, P_FA empírica = fração dos retratos **do servidor alvo**
@@ -344,7 +493,7 @@ alvo com `t_fim` entre `t_inicio + τ_hs` e `t_fim` do episódio (regime estacio
 servidor alvo mantém a comparação com a curva teórica, que usa o â desse servidor; os alvos
 da varredura (quase sempre N_s = 0) diluiriam a P_FA.
 
-### D40 — Ajuste de T com censura
+### D49 — Ajuste de T com censura
 2026-11-25 · fase 8 · aberta
 
 Exponencial, log-normal e Weibull (locação fixa em 0) ajustadas por máxima verossimilhança
@@ -352,7 +501,7 @@ com `scipy.stats.CensoredData`: fluxos expirados entram como censurados à direi
 Valores T ≤ 0 (impossíveis para essas distribuições) são excluídos e contados em
 `n_T_nao_positivo_excluidos`. O AIC de cada ajuste é reportado.
 
-### D41 — Execução completa dos experimentos
+### D50 — Execução completa dos experimentos
 2026-11-25 · fase 8 · aberta
 
 `experiments/run.py` roda cada configuração (C1, C2, C3) num processo próprio para que o pico
