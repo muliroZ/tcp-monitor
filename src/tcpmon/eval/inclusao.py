@@ -48,7 +48,7 @@ def rejeitadas_de_csv(caminho: str | Path) -> list[Rejeitada]:
     df = pd.read_csv(
         caminho,
         usecols=["fluxo", "chave", "inicio", "removido_em", "motivo_alerta"],
-        dtype={"fluxo": str, "chave": str, "motivo_alerta": str},
+        dtype=str,
         keep_default_na=False,
     )
     df = df[df["motivo_alerta"] != ""]
