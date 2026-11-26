@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Diagnóstico do atraso efetivo do netem (decisão D35, passos 2 e 3).
 
-    python lab/diagnostico_netem.py --semente 7
+    python lab/diagnostico_netem.py --semente 44
+    python lab/diagnostico_netem.py --reanalisar results/diagnostico_netem/<pasta>
 
 Para cada variante de ``lab/scenarios/diagnostico_netem.yaml``:
 
@@ -46,7 +47,7 @@ from pathlib import Path
 
 import dpkt
 import numpy as np
-from scipy import stats
+from scipy import integrate, optimize, stats
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import generate as gen  # noqa: E402
@@ -150,11 +151,36 @@ def resumo(v) -> dict:
     }
 
 
+def _atraso_netem(mu: float, sigma: float):
+    """Atraso de um pacote no netem: normal(mu, sigma) com valores negativos tratados como 0.
+
+    Para o diagnóstico só importam média e cauda; com mu = 50 e sigma = 20 a massa abaixo de 0
+    é 0,6%. Usa-se a normal truncada em 0 como referência.
+    """
+    return stats.truncnorm((0 - mu) / sigma, np.inf, loc=mu, scale=sigma)
+
+
 def media_normal_truncada(mu: float, sigma: float) -> float:
     if sigma <= 0:
         return mu
-    a = (0 - mu) / sigma
-    return float(mu + sigma * stats.norm.pdf(a) / stats.norm.sf(a))
+    return float(_atraso_netem(mu, sigma).mean())
+
+
+def referencia_minimo_dois(mu: float, sigma: float) -> dict:
+    """Média, dp e quantis do mínimo de dois atrasos independentes do netem (em ms).
+
+    É o T esperado quando o ACK puro e o segmento de dados que o segue recebem atrasos
+    independentes e o primeiro a chegar à ponte encerra o handshake.
+    """
+    if sigma <= 0:
+        return {"media_ms": mu, "dp_ms": 0.0, "p5_ms": mu, "mediana_ms": mu, "p95_ms": mu}
+    d = _atraso_netem(mu, sigma)
+    sf2 = lambda x: d.sf(x) ** 2  # noqa: E731
+    sup = mu + 12 * sigma
+    m = integrate.quad(sf2, 0, sup)[0]
+    m2 = integrate.quad(lambda x: 2 * x * sf2(x), 0, sup)[0]
+    q = {f"{n}_ms": float(optimize.brentq(lambda x: 1 - sf2(x) - p, 0, sup)) for n, p in (("p5", 0.05), ("mediana", 0.5), ("p95", 0.95))}
+    return {"media_ms": float(m), "dp_ms": float(np.sqrt(m2 - m * m)), **q}
 
 
 def rodar_variante(nome: str, cen: dict, semente: int, base: Path, imagem: str) -> dict:
@@ -190,10 +216,22 @@ def rodar_variante(nome: str, cen: dict, semente: int, base: Path, imagem: str) 
         lab.corrigir_dono()
         lab.derrubar()
 
+    for arq in ("captura.pcap", "cliente.pcap", "cliente_log.json"):
+        if (work / arq).exists():
+            shutil.move(work / arq, base / f"{nome}_{arq}")
+    shutil.rmtree(work, ignore_errors=True)
+    meta = {"captura_ponte": stats_ponte, "tc_qdisc_estatisticas": tc}
+    (base / f"{nome}_captura_meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False))
+    return analisar(nome, cen, semente, base, meta)
+
+
+def analisar(nome: str, cen: dict, semente: int, base: Path, meta: dict) -> dict:
+    """Medidas de uma variante a partir dos arquivos já gravados em ``base``."""
+    plano = gen.construir_plano(cen, semente)
     ipc, ips = cen["cliente"]["ip"], cen["servidor"]["ip"]
-    ponte = ler(work / "captura.pcap", ipc, ips)
-    dentro = ler(work / "cliente.pcap", ipc, ips)
-    log = json.loads((work / "cliente_log.json").read_text())["conexoes"]
+    ponte = ler(base / f"{nome}_captura.pcap", ipc, ips)
+    dentro = ler(base / f"{nome}_cliente.pcap", ipc, ips)
+    log = json.loads((base / f"{nome}_cliente_log.json").read_text())["conexoes"]
     cp, reusadas_ponte = conexoes(ponte)
     portas_log = [r["porta_local"] for r in log if r and r.get("porta_local")]
     reusadas_log = {p for p in portas_log if portas_log.count(p) > 1}
@@ -213,10 +251,14 @@ def rodar_variante(nome: str, cen: dict, semente: int, base: Path, imagem: str) 
     dif_s = diferencas(ponte, dentro, "S")
 
     nt = cen["netem"]
-    resultado = {
+    mu, sigma = float(nt["delay_ms"]), float(nt["jitter_ms"])
+    np.savez(base / f"{nome}.npz", T=np.array(T), d_ack=np.array(d_ack), T_puro=np.array(T_puro),
+             d_ack_puro=np.array(d_ack_puro), d_syn=np.array(d_syn))
+    return {
         "variante": nome,
         "netem": nt,
-        "media_teorica_atraso_ms": media_normal_truncada(float(nt["delay_ms"]), float(nt["jitter_ms"])),
+        "media_teorica_atraso_ms": media_normal_truncada(mu, sigma),
+        "referencia_minimo_dois_atrasos": referencia_minimo_dois(mu, sigma),
         "conexoes_planejadas": len(plano["benigno"]["instantes_s"]),
         "portas_reutilizadas_excluidas": {"ponte": len(reusadas_ponte), "log_cliente": len(reusadas_log)},
         "conexoes_com_handshake_na_ponte": len(T),
@@ -228,70 +270,92 @@ def rodar_variante(nome: str, cen: dict, semente: int, base: Path, imagem: str) 
         "d_syn_app_ate_ponte": resumo(d_syn),
         "ponte_menos_container_saida_cliente": resumo(dif_c),
         "container_menos_ponte_entrada_cliente": resumo(dif_s),
-        "captura_ponte": stats_ponte,
-        "tc_qdisc_estatisticas": tc,
+        **meta,
     }
-    np.savez(base / f"{nome}.npz", T=np.array(T), d_ack=np.array(d_ack), T_puro=np.array(T_puro),
-             d_ack_puro=np.array(d_ack_puro), d_syn=np.array(d_syn))
-    for arq in ("captura.pcap", "cliente.pcap", "cliente_log.json"):
-        if (work / arq).exists():
-            shutil.move(work / arq, base / f"{nome}_{arq}")
-    shutil.rmtree(work, ignore_errors=True)
-    return resultado
 
 
 def figura(base: Path, resultados: list[dict]) -> None:
+    """ECDF dos atrasos por variante, com as referências teóricas da variante configurada."""
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     cores = ["#257de0", "#f47230", "#00b894"]
-    fig, axs = plt.subplots(1, 3, figsize=(14, 4), sharey=True)
+    texto, texto2, grade = "#191919", "#666666", "#e5e5e5"
+    fig, axs = plt.subplots(1, 3, figsize=(15, 4.6), sharey=True)
     paineis = (
         (axs[0], "d_ack", "Primeiro pacote do cliente com ACK (o que o monitor usa)"),
         (axs[1], "d_ack_puro", "Só o ACK puro do handshake"),
         (axs[2], "d_syn", "SYN (aplicação → ponte)"),
     )
-    for cor, r in zip(cores, resultados):
-        z = np.load(base / f"{r['variante']}.npz")
-        for ax, chave, titulo in paineis:
-            v = z[chave] * 1000
+    xs = np.linspace(0, 130, 500)
+    ref = next((r for r in resultados if float(r["netem"]["jitter_ms"]) > 0), None)
+    for ax, chave, titulo in paineis:
+        if ref is not None:
+            d = _atraso_netem(float(ref["netem"]["delay_ms"]), float(ref["netem"]["jitter_ms"]))
+            ax.plot(xs, d.cdf(xs), color=texto2, linewidth=1.2, linestyle="--", label="teórico: um atraso N(50, 20)")
+            ax.plot(xs, 1 - d.sf(xs) ** 2, color=texto, linewidth=1.2, linestyle=":", label="teórico: mínimo de dois atrasos")
+        for cor, r in zip(cores, resultados):
+            v = np.sort(np.load(base / f"{r['variante']}.npz")[chave] * 1000)
             if v.size:
-                ax.hist(v, bins=np.linspace(0, 130, 66), histtype="step", linewidth=2, color=cor,
-                        label=f"{r['variante']} (média {v.mean():.1f} ms)")
-            ax.set_title(titulo, loc="left", fontsize=10)
-            ax.set_xlabel("atraso até a ponte (ms)")
-    for ax in axs:
-        ax.grid(True, color="#e5e5e5")
+                ax.step(v, np.arange(1, v.size + 1) / v.size, where="post", linewidth=2, color=cor,
+                        label=f"{r['variante']} (n = {v.size}, média {v.mean():.1f} ms)")
+        ax.set_title(titulo, loc="left", fontsize=10, color=texto)
+        ax.set_xlabel("atraso até a ponte (ms)", color=texto2)
+        ax.set_xlim(0, 130)
+        ax.grid(True, color=grade, linewidth=0.8)
+        ax.set_axisbelow(True)
         for lado in ("top", "right"):
             ax.spines[lado].set_visible(False)
-        ax.legend(frameon=False, fontsize=8)
-    axs[0].set_ylabel("conexões")
-    fig.tight_layout()
+        ax.tick_params(colors=texto2)
+    axs[0].set_ylabel("fração acumulada das conexões", color=texto2)
+    h, lab = axs[0].get_legend_handles_labels()
+    fig.legend(h, lab, loc="lower center", ncol=3, frameon=False, fontsize=8.5)
+    fig.tight_layout(rect=(0, 0.12, 1, 1))
     fig.savefig(base / "diagnostico_netem.png", dpi=150, facecolor="white")
     plt.close(fig)
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--semente", type=int, required=True)
+    ap.add_argument("--semente", type=int, help="obrigatória ao capturar")
     ap.add_argument("--saida", default=str(gen.REPO / "results" / "diagnostico_netem"))
     ap.add_argument("--variantes", nargs="*", default=None)
+    ap.add_argument("--reanalisar", metavar="PASTA",
+                    help="refaz medidas e figura a partir das capturas já gravadas em PASTA, sem subir o laboratório")
     a = ap.parse_args(argv)
     cen = gen.carregar_cenario("diagnostico_netem")
     variantes = cen.pop("variantes")
-    base = Path(a.saida) / datetime.now().strftime("%Y%m%d-%H%M%S")
-    base.mkdir(parents=True)
-    imagem = gen.imagem_lab(cen["imagem"])
-    resultados = []
-    for nome, over in variantes.items():
-        if a.variantes and nome not in a.variantes:
-            continue
-        print(f"[diag] variante {nome}", flush=True)
-        resultados.append(rodar_variante(nome, _merge(cen, over), a.semente, base, imagem))
+    if a.reanalisar:
+        base = Path(a.reanalisar)
+        anterior = json.loads((base / "diagnostico.json").read_text())
+        semente, imagem = anterior["semente"], anterior["imagem"]
+        commit_captura = anterior.get("commit_git_captura", anterior.get("commit_git"))
+        metas = {r["variante"]: {k: r[k] for k in ("captura_ponte", "tc_qdisc_estatisticas")} for r in anterior["variantes"]}
+        resultados = []
+        for r in anterior["variantes"]:
+            nome = r["variante"]
+            arq = base / f"{nome}_captura_meta.json"
+            meta = json.loads(arq.read_text()) if arq.exists() else metas[nome]
+            resultados.append(analisar(nome, _merge(cen, variantes[nome]), semente, base, meta))
+    else:
+        if a.semente is None:
+            ap.error("--semente é obrigatória ao capturar")
+        semente = a.semente
+        base = Path(a.saida) / datetime.now().strftime("%Y%m%d-%H%M%S")
+        base.mkdir(parents=True)
+        imagem = gen.imagem_lab(cen["imagem"])
+        commit_captura = gen._commit_git()
+        resultados = []
+        for nome, over in variantes.items():
+            if a.variantes and nome not in a.variantes:
+                continue
+            print(f"[diag] variante {nome}", flush=True)
+            resultados.append(rodar_variante(nome, _merge(cen, over), semente, base, imagem))
     figura(base, resultados)
-    out = {"semente": a.semente, "imagem": imagem, "commit_git": gen._commit_git(), "variantes": resultados}
+    out = {"semente": semente, "imagem": imagem, "commit_git_captura": commit_captura,
+           "commit_git_analise": gen._commit_git(), "variantes": resultados}
     (base / "diagnostico.json").write_text(json.dumps(out, indent=2, ensure_ascii=False))
     print(base / "diagnostico.json")
     return 0
