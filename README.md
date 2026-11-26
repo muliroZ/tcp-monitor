@@ -26,7 +26,7 @@ as curvas teóricas do modelo M/G/∞.
 | 3 | Laboratório (Docker) | ✅ |
 | 4 | Camada 1 — AFD | ✅ |
 | 5 | Camada 2 — Autômato temporizado | ✅ |
-| 6 | Camada 3 — Agregador e calibração | ⏳ |
+| 6 | Camada 3 — Agregador e calibração | ✅ |
 | 7 | Avaliação | ⏳ |
 | 8 | Validação analítica | ⏳ |
 | 9 | CIC-IDS2017 | bloqueada por pendências |
@@ -48,6 +48,8 @@ python -m venv .venv            # ou: uv venv .venv
 tcpmon --help
 tcpmon symbols --pcap captura.pcap            # sequência de símbolos de cada fluxo
 tcpmon run --config configs/experiments/lab.yaml --camadas 1   # executa C1 e grava results/<run_id>/
+tcpmon calibrate --config configs/experiments/lab.yaml --pcap data/lab/calibracao_s43.pcap
+tcpmon run --config configs/experiments/lab.yaml --calibracao results/lab/<run_id>-calib/calibration.json   # C3
 ```
 
 `tcpmon run` grava em `results/<run_id>/` (`run_id` = data, hora e hash curto da
@@ -112,6 +114,18 @@ atinge τ_hs o fluxo vai para ⊥ com `HANDSHAKE_EXPIRADO` (`t_evidencia` = prim
 timestamps do pcap; fluxos ainda pendentes no fim da captura ficam `truncado`, sem alerta.
 τ_hs = 63 s no padrão Linux (`tcp_synack_retries = 5`, RTO inicial 1 s: 1+2+4+8+16+32).
 
+### Camada 3 — agregador e calibração
+
+Ao fim de cada janela `[t0 + i·W, t0 + (i+1)·W)` o agregador tira um retrato de N_s (handshakes
+pendentes por IP de servidor); se N_s > k, alerta `AGG_HANDSHAKE_PENDENTE`. Também conta, por
+(IP de origem, porta de destino), os IPs de destino distintos dos fluxos iniciados na janela;
+acima de k_scan, alerta `AGG_VARREDURA_HORIZONTAL`.
+
+`tcpmon calibrate` roda as camadas 1 e 2 sobre o pcap de calibração (só benigno) e grava em
+`calibration.json`: k empírico (menor k com fração de retratos N_s > k ≤ α), k_scan pelo mesmo
+critério, k analítico (menor k com `poisson.sf(k, â) ≤ α`, â = λ̂_L·Ê[T]) e as estimativas por
+servidor. Os experimentos usam o k empírico; o analítico é reportado para comparação.
+
 ### Alfabeto
 
 Cada símbolo combina a direção (`C` cliente → servidor, `S` servidor → cliente) com a
@@ -158,6 +172,9 @@ src/tcpmon/
 ├── io/labels.py           # rótulos de episódios
 ├── monitors/dfa.py        # camada 1
 ├── monitors/timed.py      # camada 2
+├── monitors/aggregator.py # camada 3
+├── calibracao.py          # escolha de k e k_scan
+├── analytic/model.py      # M/G/∞, P_FA(k), P_D(k), k analítico
 └── eval/inclusao.py       # inclusão de alertas entre configurações
 lab/                       # laboratório Docker (generate.py, cenários, agentes)
 configs/                   # default.yaml e experimentos
