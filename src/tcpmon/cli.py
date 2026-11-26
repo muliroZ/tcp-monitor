@@ -72,6 +72,15 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_calibrate(args: argparse.Namespace) -> int:
+    from tcpmon.calibracao import calibrar
+    from tcpmon.config import load_config
+
+    cfg = load_config(args.config)
+    print(calibrar(cfg, args.pcap, saida_base=args.saida))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="tcpmon",
@@ -91,6 +100,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument("--max-fluxos", type=int, default=0, help="limita a quantidade de fluxos impressos")
     s.set_defaults(func=_cmd_symbols)
+
+    c = sub.add_parser("calibrate", help="calcula k e k_scan sobre o pcap de calibração (só benigno)")
+    c.add_argument("--config", required=True, help="arquivo YAML da configuração")
+    c.add_argument("--pcap", required=True, help="pcap de calibração (apenas tráfego benigno)")
+    c.add_argument("--saida", default=None, help="sobrescreve a pasta base de saída")
+    c.set_defaults(func=_cmd_calibrate)
 
     r = sub.add_parser("run", help="executa as camadas configuradas e grava results/<run_id>/")
     r.add_argument("--config", required=True, help="arquivo YAML da configuração")

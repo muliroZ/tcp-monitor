@@ -242,3 +242,44 @@ Como os prazos ≤ t disparam antes de cada pacote, a guarda x ≤ τ_hs de `C.A
 `SYNACK_VISTO` nunca falha. Ela continua implementada; se falhar, o fluxo expira com o
 mesmo alerta da transição temporizada e o contador `guarda_temporal_violada` registra o
 ocorrido (esperado: 0).
+
+### D28 — Conjunto de servidores dos retratos
+2026-11-25 · fase 6 · aberta
+
+A cada fim de janela tira-se um retrato de N_s para todo servidor (IP) que já recebeu ao
+menos um SYN de abertura desde o início da captura, inclusive com N_s = 0. A janela final
+incompleta não tem retrato (D24). No laboratório isso é o servidor HTTP e, depois da
+varredura, os alvos dela. **Para o CIC-IDS2017 isso precisa ser revisto**: com milhares de
+servidores ociosos, os retratos com N_s = 0 dominariam a calibração de k.
+
+### D29 — Campos dos alertas do agregador
+2026-11-25 · fase 6 · aberta
+
+`janela = i`, `t_evidencia` = início da janela (t0 + i·W) e `t_alerta` = fim da janela (instante
+da decisão). `AGG_HANDSHAKE_PENDENTE` tem `servidor` = IP e `cliente` vazio;
+`AGG_VARREDURA_HORIZONTAL` tem `cliente` = IP de origem e `servidor` vazio, com a porta de
+destino e a contagem em `detalhe`.
+
+### D30 — "Fluxos iniciados" na varredura
+2026-11-25 · fase 6 · aberta
+
+A contagem de varredura considera toda instância de fluxo nova entregue aos monitores (não
+`midstream`) cujo primeiro pacote está na janela, agrupada por (IP do cliente, porta do
+servidor) e contando IPs de servidor distintos. Não se restringe a fluxos abertos com SYN.
+
+### D31 — Estimativa de â e k analítico com vários servidores
+2026-11-25 · fase 6 · aberta
+
+λ̂_L por servidor = instâncias com primeiro `C.SYN` para o servidor ÷ (último timestamp − t0);
+Ê[T] também é estimado por servidor (fluxos `truncado` fora; expirados entram com T = τ_hs).
+Com mais de um servidor, o k analítico usa a P_FA média ponderada pelo número de retratos de
+cada servidor — a mesma população do k empírico. No laboratório há um único servidor
+benigno, e as duas formas coincidem.
+
+### D32 — Camadas na calibração
+2026-11-25 · fase 6 · aberta
+
+`tcpmon calibrate` sempre roda as camadas 1 e 2 (como pede o guia), independentemente de
+`camadas` na configuração, com o agregador em modo de coleta (retratos e contagens sem
+decisão). A pasta da calibração (`results/.../<run_id>-calib/`) guarda `flows.csv`,
+`snapshots.csv`, `varredura.csv` e `calibration.json`.

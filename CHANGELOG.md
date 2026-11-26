@@ -3,6 +3,22 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/);
 versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.4.0] — 2026-11-25
+
+Fase 6: camada 3 (agregador) e calibração.
+
+### Adicionado
+- Agregador: retrato de handshakes pendentes por servidor no fim de cada janela
+  (`AGG_HANDSHAKE_PENDENTE`) e detector de varredura horizontal (`AGG_VARREDURA_HORIZONTAL`).
+- `tcpmon calibrate`: k e k_scan empíricos, k analítico, λ̂_L, Ê[T] e â por servidor
+  (`calibration.json`); `tcpmon run --calibracao` aplica os valores.
+- `snapshots.csv` e `varredura.csv` nas execuções com agregador.
+- Núcleo do modelo analítico (`tcpmon.analytic.model`): P_FA(k), P_D(k), k empírico e
+  analítico, simulação M/G/∞.
+- Testes: contagem dos retratos, decisões, escolha de k em dados sintéticos, convergência
+  da M/G/∞ para λ·E[S], inclusão C2 ⊆ C3 nas fixtures e calibração ponta a ponta.
+- Decisões D28–D32.
+
 ## [0.3.0] — 2026-11-25
 
 Fases 4 (camada 1 — AFD) e 5 (camada 2 — autômato temporizado).
