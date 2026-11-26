@@ -24,7 +24,7 @@ as curvas teóricas do modelo M/G/∞.
 | 1 | Ambiente | ✅ |
 | 2 | Leitura e fluxos | ✅ |
 | 3 | Laboratório (Docker) | ✅ |
-| 4 | Camada 1 — AFD | ⏳ |
+| 4 | Camada 1 — AFD | ✅ |
 | 5 | Camada 2 — Autômato temporizado | ⏳ |
 | 6 | Camada 3 — Agregador e calibração | ⏳ |
 | 7 | Avaliação | ⏳ |
@@ -47,7 +47,14 @@ python -m venv .venv            # ou: uv venv .venv
 ```bash
 tcpmon --help
 tcpmon symbols --pcap captura.pcap            # sequência de símbolos de cada fluxo
+tcpmon run --config configs/experiments/lab.yaml --camadas 1   # executa C1 e grava results/<run_id>/
 ```
+
+`tcpmon run` grava em `results/<run_id>/` (`run_id` = data, hora e hash curto da
+configuração efetiva): `alerts.csv`, `flows.csv`, `counters.json` e `run.json` (configuração
+completa, commit Git, τ_hs e sua origem, SHA-256 do pcap, versões das bibliotecas, semente,
+pacotes por segundo, pico de fluxos e de memória). τ_hs vem do metadado do laboratório
+(`<pcap>.meta.json`) quando existe; senão, de `tau_hs_s`.
 
 Exemplo de saída:
 
@@ -86,6 +93,15 @@ plano) e `....plano.json`.
 
 Os parâmetros ficam em `lab/scenarios/*.yaml` (herdam de `_base.yaml`). Requisitos: Docker
 com permissão para o usuário; a imagem `tcpmon-lab` é construída automaticamente.
+
+### Camada 1 — AFD observador
+
+O AFD modela a conexão como vista pela rede (projeção observável dos estados da RFC 9293):
+`INICIAL → SYN_VISTO → SYNACK_VISTO → ESTABELECIDO → FIN_C/FIN_S → FIN_AMBOS`, mais
+`FECHADO` e o estado de rejeição ⊥. Qualquer símbolo sem transição leva a ⊥ e emite um único
+alerta (`SEM_HANDSHAKE`, `SYNACK_SEM_SYN`, `FLAGS_INVALIDAS`, `ABERTURA_SIMULTANEA`,
+`TRANSICAO_INESPERADA`) com `t_evidencia` = timestamp do pacote. A tabela completa está em
+`src/tcpmon/monitors/dfa.py`, com um teste por linha em `tests/test_dfa_transicoes.py`.
 
 ### Alfabeto
 
@@ -126,7 +142,13 @@ src/tcpmon/
 ├── io/pcap_reader.py      # dpkt → pacotes normalizados
 ├── symbols.py             # flags + direção → símbolo
 ├── flows/key.py           # chave bidirecional e direção
-└── flows/table.py         # tabela de fluxos
+├── flows/table.py         # tabela de fluxos e instâncias
+├── engine.py              # base compartilhada: ciclo de vida, eventos, janelas
+├── pipeline.py            # execução e gravação de results/<run_id>/
+├── alerts.py              # esquema de alertas
+├── io/labels.py           # rótulos de episódios
+└── monitors/dfa.py        # camada 1
+lab/                       # laboratório Docker (generate.py, cenários, agentes)
 configs/                   # default.yaml e experimentos
 tests/                     # pytest
 ```

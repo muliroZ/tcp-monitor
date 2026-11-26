@@ -45,6 +45,33 @@ def _cmd_symbols(args: argparse.Namespace) -> int:
     return 0
 
 
+def _camadas(texto: str | None) -> tuple[int, ...] | None:
+    if not texto:
+        return None
+    return tuple(int(x) for x in texto.replace(" ", "").split(",") if x)
+
+
+def _cmd_run(args: argparse.Namespace) -> int:
+    from tcpmon.config import load_config
+    from tcpmon.pipeline import carregar_calibracao, executar
+
+    cfg = load_config(args.config)
+    cal_path = args.calibracao or cfg.agregador.calibracao
+    calibracao = None
+    if cal_path:
+        calibracao = carregar_calibracao(cal_path)
+        calibracao["_caminho"] = str(cal_path)
+    pasta = executar(
+        cfg,
+        pcap=args.pcap,
+        camadas=_camadas(args.camadas),
+        calibracao=calibracao,
+        saida_base=args.saida,
+    )
+    print(pasta)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="tcpmon",
@@ -64,6 +91,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument("--max-fluxos", type=int, default=0, help="limita a quantidade de fluxos impressos")
     s.set_defaults(func=_cmd_symbols)
+
+    r = sub.add_parser("run", help="executa as camadas configuradas e grava results/<run_id>/")
+    r.add_argument("--config", required=True, help="arquivo YAML da configuração")
+    r.add_argument("--calibracao", default=None, help="calibration.json com k e k_scan (camada 3)")
+    r.add_argument("--pcap", default=None, help="sobrescreve entrada.pcap da configuração")
+    r.add_argument("--camadas", default=None, help="sobrescreve 'camadas' (ex.: 1 ou 1,2 ou 1,2,3)")
+    r.add_argument("--saida", default=None, help="sobrescreve a pasta base de saída")
+    r.set_defaults(func=_cmd_run)
 
     return p
 

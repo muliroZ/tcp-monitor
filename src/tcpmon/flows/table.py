@@ -1,7 +1,9 @@
 """Tabela de fluxos: instâncias, direção, período de carência.
 
 Esta é a parte da base compartilhada que transforma pacotes normalizados em
-(instância de fluxo, símbolo). É o mesmo código nas três configurações.
+(instância de fluxo, símbolo). É o mesmo código nas três configurações. O ciclo de vida
+(reuso de porta, lápides, remoção por inatividade, fim da captura) é conduzido por
+``tcpmon.engine``.
 """
 
 from __future__ import annotations
@@ -10,6 +12,7 @@ from dataclasses import dataclass, field
 
 from tcpmon.flows.key import Endpoint, FlowKey, direction, flow_key, format_endpoint
 from tcpmon.io.pcap_reader import Packet
+from tcpmon.monitors.dfa import Estado
 from tcpmon.symbols import Classe, Symbol, symbol
 
 
@@ -22,7 +25,7 @@ class FlowInstance:
     inicio: float
     ultimo: float
     pacotes: int = 0
-    estado: str = "INICIAL"
+    estado: Estado = Estado.INICIAL
     midstream: bool = False
     sem_handshake: bool = False
     truncado: bool = False
@@ -33,6 +36,7 @@ class FlowInstance:
     motivo_fim: str | None = None
     motivo_alerta: str | None = None
     vivo: bool = True
+    ocioso_em: float | None = None  # instante agendado da próxima verificação de inatividade
     extra: dict = field(default_factory=dict)
 
     @property
