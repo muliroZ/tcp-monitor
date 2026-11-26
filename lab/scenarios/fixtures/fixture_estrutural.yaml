@@ -1,0 +1,7 @@
+base: _fixture.yaml
+nome: fixture_estrutural
+descricao: ACK sem SYN, Xmas e NULL em episódios curtos.
+blocos:
+  - {tipo: ack_sem_syn, classe: ack_sem_syn, duracao_s: 5, taxa_pps: 4, porta_destino: 80}
+  - {tipo: xmas, classe: xmas, duracao_s: 5, taxa_pps: 4, portas_destino: [1, 1024]}
+  - {tipo: "null", classe: "null", duracao_s: 5, taxa_pps: 4, portas_destino: [1, 1024]}

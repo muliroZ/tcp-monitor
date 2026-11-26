@@ -1,0 +1,41 @@
+# Topologia e parâmetros comuns do laboratório. Os cenários herdam deste arquivo via `base`.
+# Todo tráfego de ataque fica numa rede Docker --internal (sem rota para fora do host).
+
+imagem: tcpmon-lab
+rede:
+  sub_rede: 10.77.0.0/24
+servidor:
+  ip: 10.77.0.10
+  porta: 80
+  backlog: 511                # mesmo backlog padrão do nginx; sysctls do kernel ficam no padrão
+cliente:
+  ip: 10.77.0.20
+atacante:
+  ip: 10.77.0.30
+alvos:                        # hosts da varredura horizontal (só criados se o cenário precisar)
+  primeiro_ip: 10.77.0.100
+  n: 20
+  porta: 80
+  backlog: 128
+faixa_forjada: 10.99.0.0/16   # origens forjadas do SYN Flood: faixa sem hosts
+netem:                        # decisão da equipe (DECISIONS.md D2)
+  delay_ms: 50
+  jitter_ms: 20
+  distribuicao: normal
+  limite_fila: 1000
+captura:
+  snaplen: 128
+rto_inicial_s: 1.0            # para derivar tau_hs de net.ipv4.tcp_synack_retries
+benigno:
+  taxa_conexoes_s: 5.0        # lambda_L (decisão da equipe, D1)
+  timeout_s: 10.0
+aquecimento_s: 60             # só tráfego benigno antes do primeiro episódio
+intervalo_s: 120              # pausa após cada episódio (>= tau_hs + margem)
+portas_origem:                # faixas fixas por tipo: fluxos distintos e sem colisão com lápides
+  ack_sem_syn: [30000, 39999]
+  xmas: [40000, 44999]
+  "null": [45000, 49999]
+  handshake_incompleto: [50000, 50999]
+  varredura_horizontal: [51000, 59999]
+espera_inicio_s: 3.0          # folga entre o início da captura e o deslocamento 0 do plano
+espera_logs_s: 60.0           # tempo máximo de espera pelos logs dos agentes ao final

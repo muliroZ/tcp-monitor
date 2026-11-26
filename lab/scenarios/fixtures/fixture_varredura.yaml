@@ -1,0 +1,5 @@
+base: _fixture.yaml
+nome: fixture_varredura
+descricao: Varredura horizontal curta.
+blocos:
+  - {tipo: varredura_horizontal, classe: varredura_horizontal, duracao_s: 5, taxa_pps: 5, porta_destino: 80}

@@ -1,0 +1,5 @@
+base: _base.yaml
+nome: calibracao
+descricao: Captura de calibração, só tráfego benigno, 15 min (decisão da equipe, D1).
+duracao_benigna_s: 900
+blocos: []

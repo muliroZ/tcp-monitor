@@ -119,6 +119,11 @@ def _load_raw(path: Path, _visitados: tuple[Path, ...] = ()) -> dict[str, Any]:
     return _merge(_load_raw(base_path, _visitados + (path,)), dados)
 
 
+def carregar_yaml(path: str | Path) -> dict[str, Any]:
+    """Carrega um YAML resolvendo a herança pela chave ``base`` (fusão recursiva)."""
+    return _load_raw(Path(path))
+
+
 def _num(raw: dict[str, Any], chave: str, minimo: float | None = 0.0, estrito: bool = False) -> float:
     valor = raw[chave]
     if isinstance(valor, bool) or not isinstance(valor, (int, float)):

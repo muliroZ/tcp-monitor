@@ -1,0 +1,2 @@
+episodio,classe,t_inicio,t_fim,chave_tipo,chave_valor,parametros
+e001,varredura_horizontal,1795651511.838593,1795651516.838593,origem,10.77.0.30,"{""bloco"": 0, ""duracao_s"": 5.0, ""n_capturados"": 25, ""n_enviados"": 25, ""n_planejados"": 25, ""origem_tempo"": ""plano"", ""semente"": 42, ""t_primeiro_capturado"": 1795651511.859089, ""t_ultimo_capturado"": 1795651516.639931, ""taxa_pps"": 5.0, ""tipo"": ""varredura_horizontal""}"

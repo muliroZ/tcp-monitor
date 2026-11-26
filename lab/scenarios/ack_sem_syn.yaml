@@ -1,0 +1,9 @@
+base: _base.yaml
+nome: ack_sem_syn
+descricao: Scapy envia ACK à porta aberta sem handshake; cada pacote com porta de origem nova.
+blocos:
+  - tipo: ack_sem_syn
+    classe: ack_sem_syn
+    duracao_s: 300
+    taxa_pps: 10
+    porta_destino: 80

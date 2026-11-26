@@ -1,0 +1,9 @@
+base: _base.yaml
+nome: varredura_horizontal
+descricao: SYN para a mesma porta em vários hosts (rodízio entre os alvos), a partir do IP do atacante.
+blocos:
+  - tipo: varredura_horizontal
+    classe: varredura_horizontal
+    duracao_s: 300
+    taxa_pps: 10
+    porta_destino: 80
