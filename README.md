@@ -28,7 +28,7 @@ as curvas teóricas do modelo M/G/∞.
 | 5 | Camada 2 — Autômato temporizado | ✅ |
 | 6 | Camada 3 — Agregador e calibração | ✅ |
 | 7 | Avaliação | ✅ |
-| 8 | Validação analítica | ⏳ |
+| 8 | Validação analítica | ✅ |
 | 9 | CIC-IDS2017 | bloqueada por pendências |
 | 10 | Baselines (opcional) | — |
 
@@ -58,6 +58,22 @@ de Wilson 95%, precisão, F1, latência mediana e p95 por configuração e class
 `episodios.csv`, `mcnemar.csv` (pares C1×C2, C2×C3, C1×C3 com correção de Holm e ΔP_D com IC
 de Newcombe), `falsos_alarmes.csv`, `transicao.csv`, `desempenho.csv`, `inclusao.json` e
 `resumo.md`.
+
+### Validação analítica e reprodução completa
+
+```bash
+tcpmon analytic --calibracao results/lab/<run_id>-calib --teste results/lab/<C3>
+python experiments/run.py --todos          # gera dados se faltarem, calibra, roda C1/C2/C3, avalia e valida
+```
+
+`tcpmon analytic` estima λ̂_L, Ê[T] e â = λ̂_L·Ê[T] na calibração, confere a lei de Little
+(média dos retratos × â), o índice de dispersão, o qui-quadrado contra Poisson(â) e o KS dos
+intervalos entre SYNs contra a exponencial; ajusta exponencial, log-normal e Weibull a T com
+censura em τ_hs; estima λ̂_A de cada SYN Flood pela faixa forjada e compara as curvas teóricas
+`P_FA(k) = poisson.sf(k, â)` e `P_D(k) = poisson.sf(k, â + b)` (b = λ_A·τ_hs) com os pontos
+empíricos dos retratos estacionários. Grava `analytic.json`, `curvas_roc.csv`,
+`pd_vs_taxa.csv` e `figures/` (`roc_<taxa>.png`, `pd_vs_taxa.png`, `retratos_benignos.png`,
+`tempo_handshake.png`).
 
 `tcpmon run` grava em `results/<run_id>/` (`run_id` = data, hora e hash curto da
 configuração efetiva): `alerts.csv`, `flows.csv`, `counters.json` e `run.json` (configuração
@@ -182,11 +198,14 @@ src/tcpmon/
 ├── monitors/aggregator.py # camada 3
 ├── calibracao.py          # escolha de k e k_scan
 ├── analytic/model.py      # M/G/∞, P_FA(k), P_D(k), k analítico
+├── analytic/validacao.py  # estimativas, testes de aderência, curvas (tcpmon analytic)
+├── analytic/figuras.py    # figuras do artigo
 ├── eval/inclusao.py       # inclusão de alertas entre configurações
 ├── eval/windows.py        # janelas, rótulos de janela, detecção, latência
 ├── eval/metrics.py        # métricas e tabelas (tcpmon eval)
 └── eval/stats.py          # Wilson, McNemar, Holm, diferença pareada
 lab/                       # laboratório Docker (generate.py, cenários, agentes)
+experiments/run.py         # reproduz todos os resultados
 configs/                   # default.yaml e experimentos
 tests/                     # pytest
 ```

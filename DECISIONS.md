@@ -325,3 +325,38 @@ contra a tabela de referência 20/12/2/16 (IC 0,056156 a 0,329207).
 
 Alertas cuja janela é a final incompleta não entram nas métricas; a quantidade aparece em
 `desempenho.csv` (`alertas_fora_das_janelas_completas`).
+
+### D38 — Testes de aderência à Poisson
+2026-11-25 · fase 8 · aberta
+
+Qui-quadrado dos retratos benignos da calibração contra Poisson(â), com a última classe
+sendo a cauda P(N ≥ K) e classes de frequência esperada < 5 agrupadas com a vizinha (da
+cauda para a cabeça e depois no meio). Como â vem da mesma calibração, gl = classes − 2.
+KS dos intervalos entre primeiros SYNs benignos contra a exponencial com média estimada dos
+próprios dados: o valor-p é aproximado (registrado no `analytic.json`).
+
+### D39 — População dos pontos empíricos da ROC
+2026-11-25 · fase 8 · aberta
+
+Para cada episódio de SYN Flood, P_FA empírica = fração dos retratos **do servidor alvo**
+nas janelas benignas do teste com N_s > k; P_D empírica = fração dos retratos do servidor
+alvo com `t_fim` entre `t_inicio + τ_hs` e `t_fim` do episódio (regime estacionário). Usar só o
+servidor alvo mantém a comparação com a curva teórica, que usa o â desse servidor; os alvos
+da varredura (quase sempre N_s = 0) diluiriam a P_FA.
+
+### D40 — Ajuste de T com censura
+2026-11-25 · fase 8 · aberta
+
+Exponencial, log-normal e Weibull (locação fixa em 0) ajustadas por máxima verossimilhança
+com `scipy.stats.CensoredData`: fluxos expirados entram como censurados à direita em τ_hs.
+Valores T ≤ 0 (impossíveis para essas distribuições) são excluídos e contados em
+`n_T_nao_positivo_excluidos`. O AIC de cada ajuste é reportado.
+
+### D41 — Execução completa dos experimentos
+2026-11-25 · fase 8 · aberta
+
+`experiments/run.py` roda cada configuração (C1, C2, C3) num processo próprio para que o pico
+de memória (`ru_maxrss`) seja o da configuração. A calibração do laboratório usa a semente 43
+e o teste a 42 (sementes diferentes, como pede o guia), definidas em
+`configs/experiments/lab.yaml`. A análise de sensibilidade (W = 5 e 10 s) recalibra k e
+k_scan para cada janela, sobre o mesmo pcap de calibração.
