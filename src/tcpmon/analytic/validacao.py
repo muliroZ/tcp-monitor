@@ -159,7 +159,8 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
     if float(run_cal["tau_hs_s"]) != tau:
         log.warning("τ_hs da calibração (%s) difere do teste (%s)", run_cal["tau_hs_s"], tau)
     alfa = float(cal["alfa"])
-    k_usado = int(cal["k"])
+    servidores = list(cal.get("servidores") or [])
+    k_srv = cal["k"] if isinstance(cal["k"], dict) else {s: int(cal["k"]) for s in servidores}  # D36
 
     # --- Estimativas na calibração --------------------------------------------------------
     fluxos_cal = ler_fluxos(pasta_cal)
@@ -168,7 +169,11 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
     retratos_cal = pd.read_csv(pasta_cal / "snapshots.csv")
 
     por_servidor = {}
-    for srv, linha in est.iterrows():
+    for srv in servidores:
+        if srv in est.index:
+            linha = est.loc[srv]
+        else:  # nenhum SYN para o servidor na calibração
+            linha = {"lambda_L": 0.0, "E_T": math.nan, "a": 0.0, "n_fluxos_iniciados": 0}
         r = retratos_cal.loc[retratos_cal["servidor"] == srv, "N_s"].to_numpy()
         media = float(r.mean()) if r.size else math.nan
         var = float(r.var(ddof=1)) if r.size > 1 else math.nan
@@ -180,8 +185,24 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
         )
         sel = (fluxos_cal["servidor_ip"] == srv) & fluxos_cal["T"].notna() & (fluxos_cal["truncado"] == 0)
         t_vals = fluxos_cal.loc[sel, "T"].to_numpy(dtype=float)
-        cens = (fluxos_cal.loc[sel, "motivo_fim_pendente"] == "HANDSHAKE_EXPIRADO").to_numpy()
+        motivos_t = fluxos_cal.loc[sel, "motivo_fim_pendente"].fillna("").to_numpy()
+        cens = motivos_t == "HANDSHAKE_EXPIRADO"
+        # D35 (diagnóstico 1): T separado pela forma de saída do pendente.
+        t_por_motivo = {}
+        for mot in sorted(set(motivos_t)):
+            v = t_vals[motivos_t == mot]
+            t_por_motivo[mot] = {
+                "n": int(v.size),
+                "media": float(v.mean()),
+                "mediana": float(np.median(v)),
+                "p5": float(np.percentile(v, 5)),
+                "p95": float(np.percentile(v, 95)),
+                "min": float(v.min()),
+                "max": float(v.max()),
+            }
         por_servidor[srv] = {
+            "k": k_srv.get(srv),
+            "k_analitico": int(k_analitico(alfa, [float(linha["a"])])) if not math.isnan(float(linha["a"])) else None,
             "lambda_L": linha["lambda_L"],
             "E_T": linha["E_T"],
             "a": linha["a"],
@@ -192,7 +213,9 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
             "qui_quadrado_poisson": qui_quadrado_poisson(r, float(linha["a"])) if r.size else None,
             "ks_intervalos_exponencial": ks_exponencial(np.diff(syns)),
             "ajuste_T": ajustar_t(t_vals, cens, tau),
+            "T_por_motivo_fim_pendente": t_por_motivo,
             "_T": t_vals,
+            "_T_motivos": motivos_t,
             "_cens": cens,
             "_retratos": r,
         }
@@ -243,6 +266,7 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
                 "n_retratos_benignos_teste": int(ben.size),
             }
         )
+        k_usado = int(k_srv[srv])
         for k in ks:
             nd, nb = int(np.sum(est_ret > k)), int(np.sum(ben > k))
             dl, dh = wilson(nd, est_ret.size)
@@ -250,6 +274,8 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
             curvas.append(
                 {
                     "episodio": e.episodio,
+                    "servidor": srv,
+                    "k_servidor": k_usado,
                     "lambda_A": lam,
                     "k": int(k),
                     "P_FA_teorica": float(p_fa(k, a)) if not math.isnan(a) else None,
@@ -264,11 +290,13 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
                     "n_estacionarios": int(est_ret.size),
                 }
             )
+        k_usado = int(k_srv[srv])
         nd = int(np.sum(est_ret > k_usado))
         dl, dh = wilson(nd, est_ret.size)
         pd_taxa.append(
             {
                 "episodio": e.episodio,
+                "servidor": srv,
                 "lambda_A": lam,
                 "k": k_usado,
                 "P_D_teorica": float(p_d(k_usado, a, b)) if not math.isnan(a) else None,
@@ -279,23 +307,38 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
             }
         )
 
-    validos = {s: v for s, v in por_servidor.items() if not math.isnan(v["a"])}
-    pesos = [int((retratos_cal["servidor"] == s).sum()) for s in validos]
-    k_an = k_analitico(alfa, [v["a"] for v in validos.values()], pesos) if validos and sum(pesos) else None
+    # D36: P_FA por servidor nos retratos das janelas benignas do teste, com k_s e â_s.
+    pfa_srv = {}
+    for srv in servidores:
+        ben = retratos[(retratos["servidor"] == srv) & retratos["benigna"]]["N_s"].to_numpy()
+        k_s = int(k_srv[srv])
+        a_s = float(por_servidor[srv]["a"])
+        nb = int(np.sum(ben > k_s))
+        lo, hi = wilson(nb, ben.size)
+        pfa_srv[srv] = {
+            "k": k_s,
+            "n_retratos_benignos": int(ben.size),
+            "P_FA_empirica": nb / ben.size if ben.size else None,
+            "P_FA_ic_inf": lo,
+            "P_FA_ic_sup": hi,
+            "P_FA_teorica": float(p_fa(k_s, a_s)) if not math.isnan(a_s) else None,
+        }
 
     figs = pasta_teste / "figures"
     if figuras:
         from tcpmon.analytic.figuras import gerar_figuras
 
-        gerar_figuras(figs, por_servidor, pd.DataFrame(curvas), pd.DataFrame(pd_taxa), tau, k_usado)
+        gerar_figuras(figs, por_servidor, pd.DataFrame(curvas), pd.DataFrame(pd_taxa), tau, k_srv)
 
     resultado = {
         "calibracao": str(pasta_cal),
         "teste": str(pasta_teste),
         "tau_hs_s": tau,
         "alfa": alfa,
-        "k_empirico": k_usado,
-        "k_analitico": k_an,
+        "servidores": servidores,
+        "k_empirico": k_srv,
+        "k_analitico": {s: por_servidor[s]["k_analitico"] for s in servidores},
+        "pfa_por_servidor": pfa_srv,
         "por_servidor": {s: {k: v for k, v in d.items() if not k.startswith("_")} for s, d in por_servidor.items()},
         "syn_flood": por_episodio,
         "pd_no_k_escolhido": pd_taxa,

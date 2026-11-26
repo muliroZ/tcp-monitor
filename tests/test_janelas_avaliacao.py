@@ -62,7 +62,7 @@ def test_eval_ponta_a_ponta(tmp_path):
     cfg = tmp_path / "cfg.yaml"
     cfg.write_text(f"base: {REPO / 'configs' / 'experiments' / 'lab.yaml'}\nsaida: {tmp_path / 'res'}\n")
     cal = tmp_path / "cal.json"
-    cal.write_text(json.dumps({"k": 3, "k_scan": 1}))  # valores arbitrários: o teste não depende deles
+    cal.write_text(json.dumps({"k": {"10.77.0.10": 3}, "k_scan": 1, "servidores": ["10.77.0.10"]}))  # valores arbitrários: o teste não depende deles
     pastas = []
     for camadas in ("1", "1,2", "1,2,3"):
         assert main(["run", "--config", str(cfg), "--pcap", str(pcap), "--camadas", camadas, "--calibracao", str(cal)]) == 0
@@ -72,7 +72,7 @@ def test_eval_ponta_a_ponta(tmp_path):
     for p in pastas:
         args += ["--run", str(p)]
     assert main(args) == 0
-    for arq in ("metricas.csv", "episodios.csv", "mcnemar.csv", "falsos_alarmes.csv", "transicao.csv", "desempenho.csv", "inclusao.json", "resumo.md"):
+    for arq in ("metricas.csv", "episodios.csv", "mcnemar.csv", "falsos_alarmes.csv", "transicao.csv", "desempenho.csv", "inclusao.json", "resumo.md", "pfa_por_servidor.csv"):
         assert (saida / arq).is_file()
     m = pd.read_csv(saida / "metricas.csv")
     assert set(m["config"]) == {"C1", "C2", "C3"}
@@ -81,5 +81,7 @@ def test_eval_ponta_a_ponta(tmp_path):
     assert (m.loc[m["config"] == "C1", "TP"] == 0).all()
     t = pd.read_csv(saida / "mcnemar.csv")
     assert len(t) == 6 and (t["p_holm"] >= t["p_valor"]).all()
+    pf = pd.read_csv(saida / "pfa_por_servidor.csv")
+    assert set(pf["servidor"]) == {"10.77.0.10"} and set(pf["config"]) == {"C1", "C2", "C3"}
     inc = json.loads((saida / "inclusao.json").read_text())
     assert inc["C1_em_C2"]["violacoes"] == 0 and inc["C2_em_C3"]["violacoes"] == 0

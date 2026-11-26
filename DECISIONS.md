@@ -509,3 +509,20 @@ de memória (`ru_maxrss`) seja o da configuração. A calibração do laboratór
 e o teste a 42 (sementes diferentes, como pede o guia), definidas em
 `configs/experiments/lab.yaml`. A análise de sensibilidade (W = 5 e 10 s) recalibra k e
 k_scan para cada janela, sobre o mesmo pcap de calibração.
+
+### D51 — Detalhes de implementação da D36
+2026-11-25 · fase 6 · aberta
+
+- `agregador.servidores` é obrigatório sempre que o agregador roda (C3 e calibração); sem a
+  lista, a execução para com erro. Os IPs são normalizados e não podem se repetir.
+- `agregador.k` aceita um inteiro (o mesmo k para todos os servidores da lista) ou um
+  mapeamento IP → k; o `calibration.json` grava o mapeamento. `k_scan` continua único.
+- Um servidor da lista sem nenhum SYN na calibração tem λ̂_L = 0 e â = 0 (Ê[T] indefinido);
+  o k empírico dele sai dos retratos (todos N_s = 0, logo k = 0).
+- `tcpmon run` recusa uma calibração feita para outra lista de servidores.
+- Na avaliação, `pfa_por_servidor.csv` conta como falso alarme do servidor s a janela benigna
+  com alerta cujo campo `servidor` é s (qualquer camada) e, à parte, só os
+  `AGG_HANDSHAKE_PENDENTE`. A P_FA agregada continua em `metricas.csv`.
+- Na validação analítica, `analytic.json` traz `pfa_por_servidor` (retratos benignos do teste
+  com N_s > k_s contra `poisson.sf(k_s, â_s)`) e as figuras ganham sufixo com o IP quando há
+  mais de um servidor.

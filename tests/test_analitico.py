@@ -61,6 +61,9 @@ def test_analytic_ponta_a_ponta(tmp_path):
     assert res["syn_flood"][0]["b"] == pytest.approx(5.0 * 63.0)
     srv = res["por_servidor"]["10.77.0.10"]
     assert srv["a"] == pytest.approx(srv["lambda_L"] * srv["E_T"])
-    for fig in ("roc_5.png", "pd_vs_taxa.png", "retratos_benignos.png", "tempo_handshake.png"):
+    assert res["servidores"] == ["10.77.0.10"] and res["k_empirico"]["10.77.0.10"] == srv["k"]
+    assert "10.77.0.10" in res["pfa_por_servidor"]
+    assert srv["T_por_motivo_fim_pendente"]  # D35, diagnóstico 1
+    for fig in ("roc_5.png", "pd_vs_taxa.png", "retratos_benignos.png", "tempo_handshake.png", "tempo_handshake_por_motivo.png"):
         assert (c3 / "figures" / fig).is_file(), fig
     assert (c3 / "curvas_roc.csv").is_file()
