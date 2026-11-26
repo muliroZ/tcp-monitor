@@ -27,7 +27,7 @@ as curvas teóricas do modelo M/G/∞.
 | 4 | Camada 1 — AFD | ✅ |
 | 5 | Camada 2 — Autômato temporizado | ✅ |
 | 6 | Camada 3 — Agregador e calibração | ✅ |
-| 7 | Avaliação | ⏳ |
+| 7 | Avaliação | ✅ |
 | 8 | Validação analítica | ⏳ |
 | 9 | CIC-IDS2017 | bloqueada por pendências |
 | 10 | Baselines (opcional) | — |
@@ -50,7 +50,14 @@ tcpmon symbols --pcap captura.pcap            # sequência de símbolos de cada 
 tcpmon run --config configs/experiments/lab.yaml --camadas 1   # executa C1 e grava results/<run_id>/
 tcpmon calibrate --config configs/experiments/lab.yaml --pcap data/lab/calibracao_s43.pcap
 tcpmon run --config configs/experiments/lab.yaml --calibracao results/lab/<run_id>-calib/calibration.json   # C3
+tcpmon eval --run results/lab/<C1> --run results/lab/<C2> --run results/lab/<C3> --rotulos data/lab/teste_s42_labels.csv
 ```
+
+`tcpmon eval` gera, na pasta `eval-<data>/`: `metricas.csv` (TP, FN, FP, TN, P_D e P_FA com IC
+de Wilson 95%, precisão, F1, latência mediana e p95 por configuração e classe),
+`episodios.csv`, `mcnemar.csv` (pares C1×C2, C2×C3, C1×C3 com correção de Holm e ΔP_D com IC
+de Newcombe), `falsos_alarmes.csv`, `transicao.csv`, `desempenho.csv`, `inclusao.json` e
+`resumo.md`.
 
 `tcpmon run` grava em `results/<run_id>/` (`run_id` = data, hora e hash curto da
 configuração efetiva): `alerts.csv`, `flows.csv`, `counters.json` e `run.json` (configuração
@@ -175,7 +182,10 @@ src/tcpmon/
 ├── monitors/aggregator.py # camada 3
 ├── calibracao.py          # escolha de k e k_scan
 ├── analytic/model.py      # M/G/∞, P_FA(k), P_D(k), k analítico
-└── eval/inclusao.py       # inclusão de alertas entre configurações
+├── eval/inclusao.py       # inclusão de alertas entre configurações
+├── eval/windows.py        # janelas, rótulos de janela, detecção, latência
+├── eval/metrics.py        # métricas e tabelas (tcpmon eval)
+└── eval/stats.py          # Wilson, McNemar, Holm, diferença pareada
 lab/                       # laboratório Docker (generate.py, cenários, agentes)
 configs/                   # default.yaml e experimentos
 tests/                     # pytest
