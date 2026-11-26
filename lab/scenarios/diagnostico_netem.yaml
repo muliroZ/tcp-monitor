@@ -1,0 +1,12 @@
+base: _base.yaml
+nome: diagnostico_netem
+descricao: >
+  D35: diagnóstico do atraso efetivo do netem. Só tráfego benigno; cada variante sobe a
+  topologia, captura na ponte e dentro do container cliente ao mesmo tempo e registra a porta
+  local de cada conexão no log do cliente. Nenhuma variante altera o experimento.
+duracao_benigna_s: 120
+blocos: []
+variantes:
+  configurado: {}                          # exatamente o netem do experimento (D2 + D13)
+  sem_fila_filha: {netem: {fila_filha: null}}  # efeito da pfifo
+  sem_jitter: {netem: {jitter_ms: 0}}          # controle: atraso constante de 50 ms
