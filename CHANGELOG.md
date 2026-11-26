@@ -3,6 +3,12 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/);
 versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 
+## [Não lançado]
+
+### Alterado
+- D52 decidida pela equipe: os dados do laboratório ficam como estão e a reordenação do
+  `netem` é reportada como limitação do artigo.
+
 ## [0.5.0] — 2026-11-26
 
 Fases 7 (avaliação) e 8 (validação analítica).
@@ -44,8 +50,7 @@ Fases 7 (avaliação) e 8 (validação analítica).
   taxa realizada em cada episódio (λ̂_A).
 - D52: resultado do diagnóstico. O `netem` com jitter reordena o ACK puro e o segmento de dados
   seguinte em cerca de 50% das conexões, com ou sem fila filha. Por isso T ≈ 39 ms (o mínimo
-  de dois atrasos), e não 50 ms. A verificação da D13 não se sustenta. Fica pendente com a
-  equipe.
+  de dois atrasos), e não 50 ms. A verificação da D13 não se sustenta.
 
 ## [0.4.0] — 2026-11-25
 
