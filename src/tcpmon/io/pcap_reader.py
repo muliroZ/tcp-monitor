@@ -72,6 +72,8 @@ class ReadCounters:
     tcp_aceitos: int = 0
     descartados: Counter = field(default_factory=Counter)
     inversoes_ordem: int = 0
+    primeiro_ts: float | None = None  # primeiro quadro do arquivo (qualquer protocolo)
+    max_ts: float | None = None  # maior timestamp visto (qualquer protocolo)
 
     def as_dict(self) -> dict:
         return {
@@ -80,6 +82,8 @@ class ReadCounters:
             "descartados_por_tipo": dict(sorted(self.descartados.items())),
             "descartados_total": int(sum(self.descartados.values())),
             "inversoes_ordem": self.inversoes_ordem,
+            "primeiro_ts": self.primeiro_ts,
+            "max_ts": self.max_ts,
         }
 
 
@@ -207,6 +211,10 @@ def read_packets(path: str | Path, counters: ReadCounters | None = None) -> Iter
             if ts_anterior is not None and ts < ts_anterior:
                 cont.inversoes_ordem += 1
             ts_anterior = ts
+            if cont.primeiro_ts is None:
+                cont.primeiro_ts = ts
+            if cont.max_ts is None or ts > cont.max_ts:
+                cont.max_ts = ts
 
             dec = _decodificar(buf, enlace, cont)
             if dec is None:

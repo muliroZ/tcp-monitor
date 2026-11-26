@@ -1,0 +1,4 @@
+# Análise de sensibilidade: janela W = 5 s (k e k_scan recalibrados para esta janela).
+base: lab.yaml
+janela_s: 5.0
+saida: results/lab_w5/
