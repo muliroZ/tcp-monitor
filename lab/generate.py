@@ -272,6 +272,14 @@ def imagem_lab(nome: str) -> str:
     return sh(["docker", "image", "inspect", "-f", "{{.Id}}", f"{nome}:lab"])
 
 
+def comando_netem(nt: dict) -> list[str]:
+    """Comando tc do netem; jitter 0 omite jitter e distribuição (atraso constante)."""
+    cmd = ["tc", "qdisc", "add", "dev", "eth0", "root", "handle", "1:", "netem", "delay", f"{nt['delay_ms']}ms"]
+    if float(nt["jitter_ms"]) > 0:
+        cmd += [f"{nt['jitter_ms']}ms", "distribution", nt["distribuicao"]]
+    return cmd
+
+
 class Laboratorio:
     def __init__(self, cen: dict, tag: str, workdir: Path, imagem: str) -> None:
         self.cen, self.tag, self.workdir, self.imagem = cen, tag, workdir, imagem
@@ -321,18 +329,16 @@ class Laboratorio:
         self.exec("servidor", ["ip", "route", "add", c["faixa_forjada"], "via", c["atacante"]["ip"]])
 
         self._run("cliente", ["--cap-add", "NET_ADMIN", img, "sleep", "infinity"], ip=c["cliente"]["ip"])
-        nt = c["netem"]
-        self.exec(
-            "cliente",
-            ["tc", "qdisc", "add", "dev", "eth0", "root", "handle", "1:", "netem",
-             "delay", f"{nt['delay_ms']}ms", f"{nt['jitter_ms']}ms", "distribution", nt["distribuicao"]],
-        )
-        # Fila FIFO filha: o atraso varia, mas a ordem dos pacotes é preservada (DECISIONS.md).
-        self.exec(
-            "cliente",
-            ["tc", "qdisc", "add", "dev", "eth0", "parent", "1:1", "handle", "10:", "pfifo",
-             "limit", str(nt["limite_fila"])],
-        )
+        self.exec("cliente", comando_netem(c["netem"]))
+        # Fila FIFO filha: o atraso varia, mas a ordem dos pacotes é preservada (D13).
+        if c["netem"]["fila_filha"] == "pfifo":
+            self.exec(
+                "cliente",
+                ["tc", "qdisc", "add", "dev", "eth0", "parent", "1:1", "handle", "10:", "pfifo",
+                 "limit", str(c["netem"]["limite_fila"])],
+            )
+        elif c["netem"]["fila_filha"] is not None:
+            raise SystemExit(f"netem.fila_filha desconhecida: {c['netem']['fila_filha']!r} (use pfifo ou null)")
 
         self._run(
             "atacante",

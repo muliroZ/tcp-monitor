@@ -120,6 +120,19 @@ plano) e `....plano.json`.
 Os parâmetros ficam em `lab/scenarios/*.yaml` (herdam de `_base.yaml`). Requisitos: Docker
 com permissão para o usuário; a imagem `tcpmon-lab` é construída automaticamente.
 
+Diagnóstico do atraso efetivo do `netem` (D35, resultado em D52): três variantes de 120 s
+(configurado, sem fila filha, sem jitter), com captura na ponte e dentro do cliente ao mesmo
+tempo. Saída em `results/diagnostico_netem/<data-hora>/`: `diagnostico.json` e
+`diagnostico_netem.png`, com as ECDFs e as referências teóricas.
+
+```bash
+python lab/diagnostico_netem.py --semente 44
+python lab/diagnostico_netem.py --reanalisar results/diagnostico_netem/<data-hora>   # sem Docker
+```
+
+Com jitter, o `netem` reordena pacotes da mesma conexão. O T benigno medido é o menor entre
+os atrasos do ACK puro e do segmento de dados seguinte: cerca de 39 ms, e não 50 ms (D52).
+
 ### Camada 1 — AFD observador
 
 O AFD modela a conexão como vista pela rede (projeção observável dos estados da RFC 9293):

@@ -11,14 +11,16 @@ import time
 def conexao(servidor, porta, timeout, registro, i):
     t_ini = time.time()
     erro = None
+    porta_local = None
     try:
         with socket.create_connection((servidor, porta), timeout=timeout) as s:
+            porta_local = s.getsockname()[1]
             s.sendall(b"GET / HTTP/1.0\r\nHost: servidor\r\n\r\n")
             while s.recv(4096):
                 pass
     except OSError as exc:
         erro = type(exc).__name__
-    registro[i] = {"t_inicio": t_ini, "t_fim": time.time(), "erro": erro}
+    registro[i] = {"t_inicio": t_ini, "t_fim": time.time(), "erro": erro, "porta_local": porta_local}
 
 
 def main():

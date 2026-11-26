@@ -30,6 +30,15 @@ Fases 7 (avaliação) e 8 (validação analítica).
   P_FA por servidor na avaliação (`pfa_por_servidor.csv`) e na validação analítica, ROC por
   servidor.
 - D35 (diagnóstico 1): estatísticas e figura de T separadas por `motivo_fim_pendente`.
+- D35 (diagnósticos 2 e 3): `lab/diagnostico_netem.py`. Captura na ponte e dentro do cliente
+  ao mesmo tempo, em três variantes (configurado, sem fila filha, sem jitter), com ECDFs e as
+  referências teóricas de um atraso e do mínimo de dois atrasos, e `--reanalisar` para refazer
+  a análise sem Docker. O cliente do laboratório registra a porta local de cada conexão, e a
+  fila filha do `netem` passa a ser explícita em `_base.yaml`.
+- D52: resultado do diagnóstico. O `netem` com jitter reordena o ACK puro e o segmento de dados
+  seguinte em cerca de 50% das conexões, com ou sem fila filha. Por isso T ≈ 39 ms (o mínimo
+  de dois atrasos), e não 50 ms. A verificação da D13 não se sustenta. Fica pendente com a
+  equipe.
 
 ## [0.4.0] — 2026-11-25
 
