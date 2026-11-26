@@ -11,12 +11,20 @@ Para cada variante de ``lab/scenarios/diagnostico_netem.yaml``:
 
 Medidas por conexão:
 
-- ``T`` = ACK do cliente − primeiro SYN, na ponte (o que o monitor mede);
-- ``d_ack`` = ACK do cliente − SYN-ACK, na ponte (atraso do ACK, que o kernel do cliente envia
-  assim que recebe o SYN-ACK);
+- ``T`` = primeiro pacote do cliente com ACK após o SYN-ACK − primeiro SYN, na ponte (o que o
+  monitor mede: a saída do pendente é o primeiro ``C.ACK``, com ou sem dados);
+- ``d_ack`` = esse mesmo pacote − SYN-ACK, na ponte;
+- ``T_ack_puro`` / ``d_ack_puro``: idem, mas só com o ACK puro (sem carga) do handshake;
+- ``primeiro_ack_com_dados``: conexões em que o primeiro pacote do cliente com ACK na ponte
+  carrega dados, isto é, o segmento da requisição ultrapassou o ACK puro no netem;
 - ``d_syn`` = SYN na ponte − instante registrado pela aplicação antes do ``connect`` (atraso do
   SYN, incluindo o tempo do ``connect`` até a fila de saída);
-- ``ponte − container``: diferença entre os instantes do mesmo pacote nas duas capturas.
+- diferenças entre os instantes do mesmo pacote nas duas capturas. A captura dentro do container
+  vê o egresso **depois** do qdisc (o tap do AF_PACKET fica na transmissão do driver), então ela
+  não mede o atraso do netem; serve só de controle.
+
+Portas locais reutilizadas (mais de um SYN com números de sequência distintos na mesma porta,
+ou porta repetida no log do cliente) são excluídas das medidas por conexão e contadas à parte.
 
 Compara com a média teórica da normal truncada em 0 (o netem não aplica atraso negativo).
 Nenhum parâmetro do experimento é alterado (D35). Saída em ``results/diagnostico_netem/``.
@@ -56,7 +64,10 @@ def _merge(a: dict, b: dict) -> dict:
 
 
 def ler(pcap: Path, ip_cliente: str, ip_servidor: str) -> list[tuple]:
-    """(ts, sentido, porta_cliente, flags, seq, ack) dos pacotes TCP cliente↔servidor."""
+    """(ts, sentido, porta_cliente, flags, seq, ack, carga) dos pacotes TCP cliente↔servidor.
+
+    ``carga`` vem dos cabeçalhos IP/TCP, não do buffer capturado (snaplen curto).
+    """
     out = []
     with pcap.open("rb") as fh:
         for ts, buf in dpkt.pcap.Reader(fh):
@@ -67,26 +78,60 @@ def ler(pcap: Path, ip_cliente: str, ip_servidor: str) -> list[tuple]:
             if not isinstance(ip, dpkt.ip.IP) or not isinstance(ip.data, dpkt.tcp.TCP):
                 continue
             src, dst, tcp = socket.inet_ntoa(ip.src), socket.inet_ntoa(ip.dst), ip.data
+            carga = ip.len - ip.hl * 4 - tcp.off * 4
             if src == ip_cliente and dst == ip_servidor:
-                out.append((float(ts), "C", tcp.sport, tcp.flags, tcp.seq, tcp.ack))
+                out.append((float(ts), "C", tcp.sport, tcp.flags, tcp.seq, tcp.ack, carga))
             elif src == ip_servidor and dst == ip_cliente:
-                out.append((float(ts), "S", tcp.dport, tcp.flags, tcp.seq, tcp.ack))
+                out.append((float(ts), "S", tcp.dport, tcp.flags, tcp.seq, tcp.ack, carga))
     return out
 
 
-def conexoes(pacotes: list[tuple]) -> dict[int, dict]:
-    """Por porta do cliente: instantes do primeiro SYN, primeiro SYN-ACK e primeiro ACK após ele."""
+def conexoes(pacotes: list[tuple]) -> tuple[dict[int, dict], set[int]]:
+    """Por porta do cliente: instantes do primeiro SYN, do primeiro SYN-ACK, do primeiro pacote do
+    cliente com ACK após ele (``ack``, com a indicação de carga) e do primeiro ACK puro.
+
+    Devolve também as portas reutilizadas (SYNs com números de sequência distintos).
+    """
     c: dict[int, dict] = {}
-    for ts, sentido, porta, flags, *_ in pacotes:
+    isn: dict[int, set] = {}
+    for ts, sentido, porta, flags, seq, _ack, carga in pacotes:
         d = c.setdefault(porta, {})
         f = flags & 0x3F
-        if sentido == "C" and f == SYN and "syn" not in d:
-            d["syn"] = ts
+        if sentido == "C" and f == SYN:
+            isn.setdefault(porta, set()).add(seq)
+            d.setdefault("syn", ts)
         elif sentido == "S" and f == SYN | ACK and "synack" not in d and "syn" in d:
             d["synack"] = ts
-        elif sentido == "C" and f & ACK and not f & (SYN | RST | FIN) and "synack" in d and "ack" not in d:
-            d["ack"] = ts
-    return c
+        elif sentido == "C" and f & ACK and not f & (SYN | RST) and "synack" in d:
+            if "ack" not in d:
+                d["ack"], d["ack_com_dados"] = ts, carga > 0
+            if carga == 0 and not f & FIN and "ack_puro" not in d:
+                d["ack_puro"] = ts
+    return c, {p for p, s in isn.items() if len(s) > 1}
+
+
+def diferencas(primeira: list[tuple], segunda: list[tuple], sentido: str) -> list[float]:
+    """Instante na ``segunda`` − instante na ``primeira`` para o mesmo pacote.
+
+    Pacotes idênticos (mesmo sentido, porta, flags, seq, ack e carga; p. ex. ACKs duplicados)
+    são pareados pela ordem de ocorrência: a n-ésima cópia com a n-ésima cópia.
+    """
+    ocorr: dict[tuple, list[float]] = {}
+    for ts, *ch in segunda:
+        if ch[0] == sentido:
+            ocorr.setdefault(tuple(ch), []).append(ts)
+    vistos: dict[tuple, int] = {}
+    out = []
+    for ts, *ch in primeira:
+        if ch[0] != sentido:
+            continue
+        k = tuple(ch)
+        i = vistos.get(k, 0)
+        lista = ocorr.get(k, [])
+        if i < len(lista):
+            out.append(lista[i] - ts)
+        vistos[k] = i + 1
+    return out
 
 
 def resumo(v) -> dict:
@@ -149,22 +194,23 @@ def rodar_variante(nome: str, cen: dict, semente: int, base: Path, imagem: str) 
     ponte = ler(work / "captura.pcap", ipc, ips)
     dentro = ler(work / "cliente.pcap", ipc, ips)
     log = json.loads((work / "cliente_log.json").read_text())["conexoes"]
-    cp, cd = conexoes(ponte), conexoes(dentro)
-    t_app = {r["porta_local"]: r["t_inicio"] for r in log if r and r.get("porta_local")}
+    cp, reusadas_ponte = conexoes(ponte)
+    portas_log = [r["porta_local"] for r in log if r and r.get("porta_local")]
+    reusadas_log = {p for p in portas_log if portas_log.count(p) > 1}
+    excluir = reusadas_ponte | reusadas_log
+    t_app = {r["porta_local"]: r["t_inicio"] for r in log if r and r.get("porta_local") not in (None, *excluir)}
+    validas = {p: d for p, d in cp.items() if p not in excluir and "ack" in d}
 
-    T = [d["ack"] - d["syn"] for d in cp.values() if "ack" in d]
-    d_ack = [d["ack"] - d["synack"] for d in cp.values() if "ack" in d]
-    d_syn = [cp[p]["syn"] - t for p, t in t_app.items() if p in cp and "syn" in cp[p]]
-    # Mesmo pacote nas duas capturas (sentido, porta, flags, seq, ack): ponte − container.
-    idx = {}
-    for ts, *chave in dentro:
-        idx.setdefault(tuple(chave), ts)
-    dif_c = [ts - idx[tuple(ch)] for ts, *ch in ponte if ch[0] == "C" and tuple(ch) in idx]
-    dif_s = [idx[tuple(ch)] - ts for ts, *ch in ponte if ch[0] == "S" and tuple(ch) in idx]
-    # Reordenação: pacotes do cliente cujo instante na ponte é menor que o do anterior na
-    # ordem da captura de dentro do container.
-    ordem = sorted(((idx[tuple(ch)], ts) for ts, *ch in ponte if ch[0] == "C" and tuple(ch) in idx))
-    reord = int(sum(1 for (_, a), (_, b) in zip(ordem, ordem[1:]) if b < a))
+    T = [d["ack"] - d["syn"] for d in validas.values()]
+    d_ack = [d["ack"] - d["synack"] for d in validas.values()]
+    T_puro = [d["ack_puro"] - d["syn"] for d in validas.values() if "ack_puro" in d]
+    d_ack_puro = [d["ack_puro"] - d["synack"] for d in validas.values() if "ack_puro" in d]
+    com_dados = sum(1 for d in validas.values() if d["ack_com_dados"])
+    d_syn = [cp[p]["syn"] - t for p, t in t_app.items() if p in validas]
+    # Mesmo pacote nas duas capturas. Saída do cliente: ponte − container (o container vê o
+    # egresso depois do qdisc). Entrada no cliente: container − ponte.
+    dif_c = diferencas(dentro, ponte, "C")
+    dif_s = diferencas(ponte, dentro, "S")
 
     nt = cen["netem"]
     resultado = {
@@ -172,17 +218,21 @@ def rodar_variante(nome: str, cen: dict, semente: int, base: Path, imagem: str) 
         "netem": nt,
         "media_teorica_atraso_ms": media_normal_truncada(float(nt["delay_ms"]), float(nt["jitter_ms"])),
         "conexoes_planejadas": len(plano["benigno"]["instantes_s"]),
+        "portas_reutilizadas_excluidas": {"ponte": len(reusadas_ponte), "log_cliente": len(reusadas_log)},
         "conexoes_com_handshake_na_ponte": len(T),
+        "primeiro_ack_com_dados": {"n": com_dados, "fracao": com_dados / len(T) if T else None},
         "T_ponte": resumo(T),
         "d_ack_ponte": resumo(d_ack),
+        "T_ponte_ack_puro": resumo(T_puro),
+        "d_ack_puro_ponte": resumo(d_ack_puro),
         "d_syn_app_ate_ponte": resumo(d_syn),
         "ponte_menos_container_saida_cliente": resumo(dif_c),
-        "ponte_menos_container_entrada_cliente": resumo(dif_s),
-        "pacotes_do_cliente_fora_de_ordem_na_ponte": reord,
+        "container_menos_ponte_entrada_cliente": resumo(dif_s),
         "captura_ponte": stats_ponte,
         "tc_qdisc_estatisticas": tc,
     }
-    np.savez(base / f"{nome}.npz", T=np.array(T), d_ack=np.array(d_ack), d_syn=np.array(d_syn))
+    np.savez(base / f"{nome}.npz", T=np.array(T), d_ack=np.array(d_ack), T_puro=np.array(T_puro),
+             d_ack_puro=np.array(d_ack_puro), d_syn=np.array(d_syn))
     for arq in ("captura.pcap", "cliente.pcap", "cliente_log.json"):
         if (work / arq).exists():
             shutil.move(work / arq, base / f"{nome}_{arq}")
@@ -197,16 +247,21 @@ def figura(base: Path, resultados: list[dict]) -> None:
     import matplotlib.pyplot as plt
 
     cores = ["#257de0", "#f47230", "#00b894"]
-    fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+    fig, axs = plt.subplots(1, 3, figsize=(14, 4), sharey=True)
+    paineis = (
+        (axs[0], "d_ack", "Primeiro pacote do cliente com ACK (o que o monitor usa)"),
+        (axs[1], "d_ack_puro", "Só o ACK puro do handshake"),
+        (axs[2], "d_syn", "SYN (aplicação → ponte)"),
+    )
     for cor, r in zip(cores, resultados):
         z = np.load(base / f"{r['variante']}.npz")
-        for ax, chave, titulo in ((axs[0], "d_ack", "Atraso do ACK na ponte (d_ack)"), (axs[1], "d_syn", "Atraso do SYN (aplicação → ponte)")):
+        for ax, chave, titulo in paineis:
             v = z[chave] * 1000
             if v.size:
                 ax.hist(v, bins=np.linspace(0, 130, 66), histtype="step", linewidth=2, color=cor,
                         label=f"{r['variante']} (média {v.mean():.1f} ms)")
             ax.set_title(titulo, loc="left", fontsize=10)
-            ax.set_xlabel("ms")
+            ax.set_xlabel("atraso até a ponte (ms)")
     for ax in axs:
         ax.grid(True, color="#e5e5e5")
         for lado in ("top", "right"):
