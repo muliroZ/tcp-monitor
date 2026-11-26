@@ -25,7 +25,7 @@ as curvas teóricas do modelo M/G/∞.
 | 2 | Leitura e fluxos | ✅ |
 | 3 | Laboratório (Docker) | ✅ |
 | 4 | Camada 1 — AFD | ✅ |
-| 5 | Camada 2 — Autômato temporizado | ⏳ |
+| 5 | Camada 2 — Autômato temporizado | ✅ |
 | 6 | Camada 3 — Agregador e calibração | ⏳ |
 | 7 | Avaliação | ⏳ |
 | 8 | Validação analítica | ⏳ |
@@ -103,6 +103,15 @@ alerta (`SEM_HANDSHAKE`, `SYNACK_SEM_SYN`, `FLAGS_INVALIDAS`, `ABERTURA_SIMULTAN
 `TRANSICAO_INESPERADA`) com `t_evidencia` = timestamp do pacote. A tabela completa está em
 `src/tcpmon/monitors/dfa.py`, com um teste por linha em `tests/test_dfa_transicoes.py`.
 
+### Camada 2 — autômato temporizado
+
+Relógio por instância de fluxo, zerado no primeiro `C.SYN` (retransmissões não o zeram).
+Com o handshake pendente (`SYN_VISTO`/`SYNACK_VISTO`) vale o invariante x ≤ τ_hs; quando x
+atinge τ_hs o fluxo vai para ⊥ com `HANDSHAKE_EXPIRADO` (`t_evidencia` = primeiro SYN,
+`t_alerta` = `t_evidencia` + τ_hs). Os prazos ficam numa fila de prioridade disparada pelos
+timestamps do pcap; fluxos ainda pendentes no fim da captura ficam `truncado`, sem alerta.
+τ_hs = 63 s no padrão Linux (`tcp_synack_retries = 5`, RTO inicial 1 s: 1+2+4+8+16+32).
+
 ### Alfabeto
 
 Cada símbolo combina a direção (`C` cliente → servidor, `S` servidor → cliente) com a
@@ -147,7 +156,9 @@ src/tcpmon/
 ├── pipeline.py            # execução e gravação de results/<run_id>/
 ├── alerts.py              # esquema de alertas
 ├── io/labels.py           # rótulos de episódios
-└── monitors/dfa.py        # camada 1
+├── monitors/dfa.py        # camada 1
+├── monitors/timed.py      # camada 2
+└── eval/inclusao.py       # inclusão de alertas entre configurações
 lab/                       # laboratório Docker (generate.py, cenários, agentes)
 configs/                   # default.yaml e experimentos
 tests/                     # pytest
