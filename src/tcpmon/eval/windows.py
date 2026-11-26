@@ -4,7 +4,7 @@ Janelas ``[t0 + i·W, t0 + (i+1)·W)``, i = 0 … n−1 (n = janelas completas d
 
 - Uma janela é **positiva para a classe c** se intersecta algum episódio da classe c.
 - **Zona de transição:** janelas que intersectam ``[t_fim, t_fim + τ_hs]`` de um episódio e não
-  são positivas para ele não são nem positivas nem benignas (D33). Os alertas delas são
+  são positivas para ele não são nem positivas nem benignas (D42). Os alertas delas são
   reportados à parte.
 - Uma janela é **benigna** se não intersecta nenhum episódio nem zona de transição.
 - Uma janela positiva é **detectada** se tem ao menos um alerta cuja chave casa com a chave de

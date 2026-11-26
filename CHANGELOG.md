@@ -17,7 +17,7 @@ Fases 7 (avaliação) e 8 (validação analítica).
   figuras.
 - `experiments/run.py --todos`: reprodução completa com um comando.
 - Testes estatísticos conferidos contra valores publicados (Wilson, McNemar, Holm, Newcombe).
-- Decisões D33–D41.
+- Decisões D42–D50 (implementação das fases 7 e 8).
 
 ## [0.4.0] — 2026-11-25
 
