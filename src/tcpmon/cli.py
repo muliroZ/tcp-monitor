@@ -91,6 +91,13 @@ def _cmd_eval(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_analytic(args: argparse.Namespace) -> int:
+    from tcpmon.analytic.validacao import validar_modelo
+
+    print(validar_modelo(args.calibracao, args.teste, figuras=not args.sem_figuras))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="tcpmon",
@@ -131,6 +138,12 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("--saida", default=None, help="pasta das tabelas (padrão: <pasta da 1ª execução>/../eval-<data>)")
     e.add_argument("--quieto", action="store_true", help="não imprime o resumo")
     e.set_defaults(func=_cmd_eval)
+
+    a = sub.add_parser("analytic", help="validação analítica (M/G/∞) e suas figuras")
+    a.add_argument("--calibracao", required=True, help="pasta da calibração (contém calibration.json)")
+    a.add_argument("--teste", required=True, help="pasta de uma execução C3 sobre o pcap de teste")
+    a.add_argument("--sem-figuras", action="store_true", help="não gera as figuras")
+    a.set_defaults(func=_cmd_analytic)
 
     return p
 

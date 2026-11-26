@@ -3,6 +3,22 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/);
 versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.5.0] — 2026-11-25
+
+Fases 7 (avaliação) e 8 (validação analítica).
+
+### Adicionado
+- `tcpmon eval`: rotulagem de janelas (positivas, transição, benignas), TP/FN/FP/TN, P_D e
+  P_FA com IC de Wilson, precisão, F1, latência (mediana e p95), desempenho, McNemar (exato
+  ou corrigido) com Holm e ΔP_D com IC de Newcombe para dados pareados; tabelas CSV e
+  `resumo.md`.
+- `tcpmon analytic`: λ̂_L, Ê[T], â, lei de Little, índice de dispersão, qui-quadrado e KS,
+  ajuste de T com censura, λ̂_A por episódio, curvas ROC teóricas com pontos empíricos e
+  figuras.
+- `experiments/run.py --todos`: reprodução completa com um comando.
+- Testes estatísticos conferidos contra valores publicados (Wilson, McNemar, Holm, Newcombe).
+- Decisões D33–D41.
+
 ## [0.4.0] — 2026-11-25
 
 Fase 6: camada 3 (agregador) e calibração.
