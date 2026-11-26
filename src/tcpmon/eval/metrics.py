@@ -21,7 +21,12 @@ import numpy as np
 import pandas as pd
 
 from tcpmon.alerts import read_alerts
-from tcpmon.eval.inclusao import alertas_ausentes
+from tcpmon.eval.inclusao import (
+    alertas_ausentes,
+    divergencia_por_janela,
+    inclusao_por_traco,
+    rejeitadas_de_csv,
+)
 from tcpmon.eval.stats import diferenca_pareada, holm, mcnemar, wilson
 from tcpmon.eval.windows import (
     alertas_por_janela,
@@ -221,14 +226,35 @@ def avaliar(runs: list[str | Path], rotulos: str | Path, saida: str | Path | Non
 
     inclusao = {}
     por_cfg = {e.config: e for e in execs}
-    for menor, maior in (("C1", "C2"), ("C2", "C3")):
-        if menor in por_cfg and maior in por_cfg:
-            falt = alertas_ausentes(por_cfg[menor].alertas, por_cfg[maior].alertas)
-            inclusao[f"{menor}_em_{maior}"] = {
-                "alertas_em_" + menor: len(por_cfg[menor].alertas),
-                "ausentes_em_" + maior: len(falt),
-                "exemplos_ausentes": [a.identidade() for a in falt[:20]],
-            }
+    if "C1" in por_cfg and "C2" in por_cfg:
+        # D33: C1 ⊆ C2 por traço rejeitado; divergência por janela reportada à parte.
+        r1 = rejeitadas_de_csv(por_cfg["C1"].pasta / "flows.csv")
+        r2 = rejeitadas_de_csv(por_cfg["C2"].pasta / "flows.csv")
+        viol = inclusao_por_traco(r1, r2)
+        div = divergencia_por_janela(por_cfg["C1"].alertas, por_cfg["C2"].alertas)
+        inclusao["C1_em_C2"] = {
+            "criterio": "traço rejeitado (D33)",
+            "instancias_rejeitadas_C1": len(r1),
+            "instancias_rejeitadas_C2": len(r2),
+            "violacoes": len(viol),
+            "exemplos_violacoes": [
+                {"C1": v.menor.__dict__, "C2": v.maior.__dict__ if v.maior else None} for v in viol[:20]
+            ],
+            "divergencia_por_janela": {
+                "alertas_C1": len(por_cfg["C1"].alertas),
+                "sem_alerta_C2_com_chave_na_janela": len(div),
+                "por_motivo": dict(Counter(a.motivo for a in div)),
+                "exemplos": [a.identidade() for a in div[:20]],
+            },
+        }
+    if "C2" in por_cfg and "C3" in por_cfg:
+        falt = alertas_ausentes(por_cfg["C2"].alertas, por_cfg["C3"].alertas)
+        inclusao["C2_em_C3"] = {
+            "criterio": "alerta idêntico (D33)",
+            "alertas_C2": len(por_cfg["C2"].alertas),
+            "violacoes": len(falt),
+            "exemplos_violacoes": [a.identidade() for a in falt[:20]],
+        }
 
     pd.DataFrame(metricas).to_csv(saida / "metricas.csv", index=False)
     pd.DataFrame(eps).to_csv(saida / "episodios.csv", index=False)
@@ -322,7 +348,12 @@ def _resumo(meta, metricas, testes, desemp, inclusao) -> str:
     if inclusao:
         linhas += ["", "## Inclusão de alertas entre configurações", ""]
         for k, v in inclusao.items():
-            n_aus = [x for c, x in v.items() if c.startswith("ausentes")][0]
-            linhas.append(f"- {k.replace('_em_', ' ⊆ ')}: {n_aus} alertas ausentes")
+            linhas.append(f"- {k.replace('_em_', ' ⊆ ')} ({v['criterio']}): {v['violacoes']} violações")
+            if "divergencia_por_janela" in v:
+                d = v["divergencia_por_janela"]
+                linhas.append(
+                    f"  - divergência por janela: {d['sem_alerta_C2_com_chave_na_janela']} de {d['alertas_C1']} "
+                    "alertas da C1 sem alerta da C2 com a mesma chave na mesma janela"
+                )
     linhas.append("")
     return "\n".join(linhas)

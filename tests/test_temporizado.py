@@ -116,3 +116,33 @@ def test_c1_nao_expira():
     assert so_expirados(e) == []
     f = next(f for f in e.saida.fluxos if f.cliente == CLI)
     assert f.estado is Estado.SYNACK_VISTO and not f.truncado
+
+
+def test_inclusao_por_traco_no_caso_da_d26():
+    """Pacote inválido depois da expiração: o alerta idêntico some na C2, mas o traço continua
+    rejeitado (mais cedo). A divergência por janela registra o efeito (D33)."""
+    from tcpmon.eval.inclusao import (
+        alertas_ausentes,
+        divergencia_por_janela,
+        inclusao_por_traco,
+        rejeitadas_de_fluxos,
+    )
+
+    pacotes = pendente(0.0) + [pkt(100.0, CLI, SRV, FLAGS["XMAS"])]
+    c1 = rodar(pacotes, camadas=(1,))
+    c2 = rodar(pacotes, camadas=(1, 2))
+    assert motivos(c1) == ["FLAGS_INVALIDAS"] and motivos(c2) == ["HANDSHAKE_EXPIRADO"]
+    assert len(alertas_ausentes(c1.alertas, c2.alertas)) == 1  # inclusão por alerta idêntico falha
+    r1, r2 = rejeitadas_de_fluxos(c1.saida.fluxos), rejeitadas_de_fluxos(c2.saida.fluxos)
+    assert r1[0].t_alerta == 100.0 and r2[0].t_alerta == TAU
+    assert inclusao_por_traco(r1, r2) == []  # a inclusão por traço vale
+    assert len(divergencia_por_janela(c1.alertas, c2.alertas)) == 1
+
+
+def test_inclusao_por_traco_detecta_violacao():
+    from tcpmon.eval.inclusao import Rejeitada, inclusao_por_traco
+
+    a = Rejeitada("k", 0.0, 5.0, "X", "k#0")
+    assert len(inclusao_por_traco([a], [])) == 1
+    assert len(inclusao_por_traco([a], [Rejeitada("k", 0.0, 6.0, "Y", "k#1")])) == 1
+    assert inclusao_por_traco([a], [Rejeitada("k", 0.0, 5.0, "Y", "k#1")]) == []

@@ -22,6 +22,9 @@ Fases 7 (avaliação) e 8 (validação analítica).
 ### Alterado
 - D34: `handshake_incompleto` com chave de associação por origem e 60 SYNs (era servidor e 20);
   a captura `teste` passa a durar ~154 min. Fixture temporal regenerada.
+- D33: inclusão C1 ⊆ C2 verificada por traço rejeitado (mesma chave e instante do primeiro
+  pacote, `t_alerta` da C2 ≤ C1); a comparação por alerta idêntico vira o relatório de
+  divergência por janela. C2 ⊆ C3 continua por alerta idêntico.
 
 ## [0.4.0] — 2026-11-25
 

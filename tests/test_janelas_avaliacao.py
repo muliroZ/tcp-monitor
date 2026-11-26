@@ -82,4 +82,4 @@ def test_eval_ponta_a_ponta(tmp_path):
     t = pd.read_csv(saida / "mcnemar.csv")
     assert len(t) == 6 and (t["p_holm"] >= t["p_valor"]).all()
     inc = json.loads((saida / "inclusao.json").read_text())
-    assert inc["C1_em_C2"]["ausentes_em_C2"] == 0 and inc["C2_em_C3"]["ausentes_em_C3"] == 0
+    assert inc["C1_em_C2"]["violacoes"] == 0 and inc["C2_em_C3"]["violacoes"] == 0
