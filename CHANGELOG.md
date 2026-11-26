@@ -3,6 +3,24 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/);
 versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.3.0] — 2026-11-25
+
+Fases 4 (camada 1 — AFD) e 5 (camada 2 — autômato temporizado).
+
+### Adicionado
+- AFD observador com estado de rejeição ⊥ e motivos de alerta; tabela de transições do guia.
+- Motor compartilhado: instâncias, carência, reuso de porta, lápides, remoção por
+  inatividade, fila de eventos temporizados e janelas, ganchos para as camadas 2 e 3.
+- Camada 2: relógio por fluxo, prazo τ_hs em fila de prioridade, guarda, marcação `truncado`.
+- `tcpmon run`: grava `alerts.csv`, `flows.csv`, `counters.json` e `run.json`; τ_hs lido do
+  metadado do laboratório.
+- Verificação de inclusão de alertas entre configurações (`tcpmon.eval.inclusao`).
+- Configurações de experimento `configs/experiments/lab*.yaml` (W = 1, 5 e 10 s).
+- Testes: uma linha da tabela por teste, ciclo de vida, temporização (expiração em τ_hs,
+  retransmissão que não zera o relógio, prazo depois do fim da captura), integração com as
+  fixtures do laboratório e inclusão C1 ⊆ C2.
+- Decisões D20–D27.
+
 ## [0.2.0] — 2026-11-25
 
 Fase 3 do guia: laboratório.

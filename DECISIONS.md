@@ -173,3 +173,72 @@ os dois pares são aceitos.
 Seguindo o guia, a chave do `handshake_incompleto` é o servidor alvo. Consequência: um alerta
 de tráfego benigno para o mesmo servidor, na mesma janela, também conta como detecção.
 O mesmo vale para o SYN Flood.
+
+### D20 — Inatividade nos estados que o guia não lista
+2026-11-25 · fase 4 · aberta
+
+O guia define a remoção por inatividade para `FIN_AMBOS`/`FECHADO` (2×MSL), `ESTABELECIDO`
+(3600 s) e ⊥ (imediata). Para `SYN_VISTO`, `SYNACK_VISTO`, `FIN_C`, `FIN_S` e fluxos
+`midstream` foi usado o mesmo limite de `ESTABELECIDO` (`ocioso_estabelecido_s`). Motivo:
+evitar memória ilimitada sem inventar parâmetro novo; conexões semi-encerradas podem durar
+legitimamente. Na C1 isso significa que handshakes pendentes ficam até 3600 s em memória
+(o "monitor como alvo" é medido pelo pico de fluxos).
+
+### D21 — SYN numa chave `midstream`
+2026-11-25 · fase 4 · aberta
+
+Um SYN (de qualquer lado) que chega a uma chave marcada `midstream` encerra essa instância
+(motivo `syn_em_midstream`) e abre uma nova, que entra nos monitores. Os demais pacotes de
+um fluxo `midstream` são contados e ignorados.
+
+### D22 — SYN numa chave removida (lápide)
+2026-11-25 · fase 4 · aberta
+
+O guia fala em "SYN do cliente"; numa chave removida não há fluxo vivo para definir o
+cliente. Qualquer SYN abre uma nova instância e o remetente é o cliente dela (mesma regra
+do primeiro pacote de um fluxo). Pacotes não-SYN numa lápide são contados
+(`pacotes_lapide`) e ignorados.
+
+### D23 — Ordem de eventos simultâneos
+2026-11-25 · fases 4–6 · aberta
+
+Antes de um pacote com timestamp t, disparam todos os eventos com instante ≤ t (como no
+guia; um prazo exatamente em t expira antes do pacote). Em empate de instantes: fim de
+janela, depois prazo de handshake, depois inatividade. Assim o retrato da janela i
+corresponde ao estado imediatamente antes do instante final (limite à esquerda) e um pacote
+no instante exato da fronteira pertence à janela seguinte.
+
+### D24 — t0 e fim da captura
+2026-11-25 · fase 4 · aberta
+
+t0 é o timestamp do primeiro quadro do arquivo (de qualquer protocolo) e o "último
+timestamp" é o maior timestamp visto. Janelas que terminam depois do último timestamp não
+são fechadas (sem retrato); `run.json` registra `janelas_completas`.
+
+### D25 — Colunas adicionais em `flows.csv`
+2026-11-25 · fase 4 · aberta
+
+Além das colunas do guia: `t_primeiro_syn`, `t_fim_pendente` e `motivo_fim_pendente`
+(necessárias para estimar T na validação analítica), `removido_em`, `motivo_fim`
+(`rejeicao`, `inatividade`, `reuso_de_porta`, `syn_em_midstream`, `fim_da_captura`) e
+`motivo_alerta`.
+
+### D26 — Exceção teórica à inclusão C1 ⊆ C2 (levar à equipe)
+2026-11-25 · fase 5 · aberta
+
+Seguindo o guia, um fluxo que expira na camada 2 vai para ⊥, é removido e vira lápide. Na
+C1 o mesmo fluxo continua vivo (sem prazo). Se, **depois** de τ_hs, chegar a essa chave um
+pacote que a C1 rejeita (por exemplo, flags inválidas), a C1 emite um alerta que a C2 não
+emite (na C2 o pacote cai na lápide e é ignorado). De forma análoga, um SYN tardio abre
+uma instância nova na C2 e não na C1, e a numeração de instâncias diverge. A inclusão
+estrita só vale quando nenhum pacote anômalo chega a um fluxo já expirado. Nada foi
+alterado para esconder o caso: `tcpmon.eval.inclusao.alertas_ausentes` lista qualquer
+violação, e a avaliação a reporta. Nas fixtures do laboratório não há violação.
+
+### D27 — Guarda temporal
+2026-11-25 · fase 5 · aberta
+
+Como os prazos ≤ t disparam antes de cada pacote, a guarda x ≤ τ_hs de `C.ACK`/`C.FIN` em
+`SYNACK_VISTO` nunca falha. Ela continua implementada; se falhar, o fluxo expira com o
+mesmo alerta da transição temporizada e o contador `guarda_temporal_violada` registra o
+ocorrido (esperado: 0).

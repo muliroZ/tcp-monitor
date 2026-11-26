@@ -1,0 +1,11 @@
+# Experimento principal no laboratório (W = 1 s).
+base: ../default.yaml
+carencia_s: 0.0               # no laboratório a captura começa antes do tráfego
+entrada:
+  pcap: data/lab/teste_s42.pcap
+  rotulos: data/lab/teste_s42_labels.csv
+  metadado: null              # usa data/lab/teste_s42.meta.json (tau_hs da sysctl do servidor)
+saida: results/lab/
+experimento:                  # lido por experiments/run.py
+  calibracao_pcap: data/lab/calibracao_s43.pcap
+  configuracoes: [[1], [1, 2], [1, 2, 3]]
