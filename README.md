@@ -32,11 +32,15 @@ as curvas teóricas do modelo M/G/∞.
 | 9 | CIC-IDS2017 e CIC-DDoS2019 (D37) | bloqueada: aguardando a equipe (servidores e pcaps) |
 | 10 | Baselines Zeek e Suricata (D41) | depois da fase 9 |
 
-Limitação do laboratório (D52, decidida pela equipe): o `netem` com jitter reordena pacotes
-de uma mesma conexão, e o T benigno efetivo é ≈ 39 ms; os dados ficam como estão e a
-reordenação é reportada no artigo. Decisões abertas com a equipe: D53 (P_D teórica com a taxa
-realizada), D54 (dependência entre janelas nos intervalos de Wilson) e D55 (efeito de W no k
-empírico). Ver [DECISIONS.md](DECISIONS.md).
+Limitações reportadas no artigo (decididas pela equipe):
+
+- D52: o `netem` com jitter reordena pacotes de uma mesma conexão, e o T benigno efetivo é
+  ≈ 39 ms. Os dados do laboratório ficam como estão.
+- D54: as janelas não são independentes, e os intervalos de Wilson por janela subestimam a
+  incerteza, sobretudo nas taxas baixas de SYN Flood e na P_FA do agregador.
+
+Também decididas, sem mudanças: D53 (a P_D teórica com a taxa realizada continua junto da
+nominal) e D55 (k empírico da calibração com o mesmo W). Ver [DECISIONS.md](DECISIONS.md).
 
 ## Instalação
 
