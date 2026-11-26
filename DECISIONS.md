@@ -179,6 +179,9 @@ demais dias são teste. Nada medido no teste volta para a escolha de parâmetros
 - Baixar os pcaps do CIC-IDS2017 (segunda-feira e dias de ataque) e do dia de SYN Flood do
   CIC-DDoS2019. A equipe ainda não os tem.
 - Definir a calibração do CIC-DDoS2019 (D37).
+- D52: a fila `pfifo` da D13 não impede a reordenação do `netem` neste kernel. Decidir se os
+  dados do laboratório ficam como estão (T efetivo ≈ 39 ms, reordenação reportada como
+  limitação) ou se o aparato muda e as capturas são refeitas.
 
 ---
 
@@ -262,6 +265,10 @@ recebe a sysctl explicitamente.
 O `netem` com *jitter* reordena pacotes por padrão. Foi adicionada uma fila `pfifo` filha
 (`limit 1000`): o atraso varia, mas a ordem é preservada. Motivo: a decisão D2 pediu
 latência, não reordenação; reordenação é uma limitação discutida à parte no artigo.
+
+**Verificação (D52):** neste kernel a fila filha **não** impede a reordenação. O ACK puro do
+handshake e o segmento de dados que o segue trocam de ordem em cerca de metade das conexões,
+com ou sem a `pfifo`. A intenção da D13 não é cumprida pelo aparato; decisão com a equipe.
 
 ### D14 — Backlog do servidor e alvos da varredura
 2026-11-25 · fase 3 · aberta
@@ -526,3 +533,51 @@ k_scan para cada janela, sobre o mesmo pcap de calibração.
 - Na validação analítica, `analytic.json` traz `pfa_por_servidor` (retratos benignos do teste
   com N_s > k_s contra `poisson.sf(k_s, â_s)`) e as figuras ganham sufixo com o IP quando há
   mais de um servidor.
+
+### D52 — Resultado do diagnóstico da D35: reordenação no `netem`
+2026-11-26 · fase 8 · aberta · resultado da D35; contradiz a verificação da D13
+
+**Causa medida.** O `netem` sorteia um atraso independente N(50, 20) ms para cada pacote. O
+ACK puro do handshake e o segmento da requisição HTTP, que o cliente envia logo depois,
+recebem atrasos independentes; em cerca de metade das conexões o segmento de dados chega à
+ponte antes do ACK puro. O handshake termina no primeiro pacote do cliente com ACK, com ou sem
+dados: no monitor (primeiro `C.ACK` em `SYNACK_VISTO`) e também no kernel do servidor, que
+estabelece a conexão com esse segmento. Assim, T = mínimo de dois atrasos independentes, e
+não um atraso.
+
+**Medidas** (`lab/diagnostico_netem.py --semente 44`, 120 s de tráfego benigno por variante,
+captura na ponte e dentro do container cliente; kernel 7.3.4-300.fc45; resultados em
+`results/diagnostico_netem/20261126-113104/`):
+
+| Variante | Conexões | 1º ACK com dados | T (o monitor) | T pelo ACK puro | SYN app → ponte |
+| --- | --- | --- | --- | --- | --- |
+| configurado (50 ± 20 ms, `pfifo`) | 547 | 50,3% | 39,5 ± 15,9 ms | 49,5 ± 18,7 ms | 51,1 ± 19,4 ms |
+| sem fila filha | 585 | 48,5% | 38,9 ± 16,9 ms | 48,9 ± 19,5 ms | 49,8 ± 20,5 ms |
+| sem jitter (50 ms) | 583 | 0% | 50,2 ± 0,08 ms | 50,2 ± 0,08 ms | 50,5 ± 2,2 ms |
+
+Referências teóricas (normal truncada em 0): um atraso tem média 50,35 ms; o mínimo de dois
+atrasos independentes tem média 39,28 ms, dp 15,80 ms, p5 12,8 ms e p95 65,3 ms. Na variante
+configurada, T medido tem p5 12,1 ms e p95 65,0 ms. Na calibração do experimento
+(`calibracao_s43.pcap`), o pacote de dados chega antes do ACK puro em 50,0% das 3 819
+conexões; T pelo primeiro ACK = 38,9 ms e pelo ACK puro = 48,5 ms.
+
+**Conclusões.**
+
+- Não é erro de medição no código: com atraso constante (sem jitter), T medido na ponte é
+  50,2 ms. O ponto de captura e a leitura do pcap estão corretos.
+- A fila `pfifo` filha não muda nada: a reordenação ocorre igual com e sem ela. A
+  verificação da D13 (“a ordem é preservada”) é falsa neste kernel.
+- O corte de atrasos negativos da normal é desprezível (0,6% da massa; média 50,35 ms).
+- O T que o monitor mede é o tempo que a conexão de fato fica pendente no servidor. Ê[T] = 38,7 ms
+  na calibração é o valor efetivo, e é ele que entra em â e na lei de Little.
+- Pela D35, os parâmetros do `netem` não foram alterados. O artigo deve reportar o atraso
+  efetivo e a causa: o `netem` com jitter reordena pacotes de uma mesma conexão.
+
+**Controles.** A captura dentro do container vê o egresso **depois** do qdisc (diferença
+ponte − container de 0,02 ms na saída), então ela não mede o atraso do `netem` e não serve
+para contar reordenação. Na entrada, container − ponte fica entre 0 e 0,04 ms. Pacotes
+idênticos (ACKs duplicados) são pareados pela ordem de ocorrência. Portas locais
+reutilizadas são excluídas: 19 na variante configurada, 0 sem fila filha, 1 sem jitter.
+
+**Pendente com a equipe:** manter os dados como estão (reordenação reportada como limitação)
+ou mudar o aparato para cumprir a D13 e refazer as capturas.
