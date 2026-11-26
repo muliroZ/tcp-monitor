@@ -57,7 +57,8 @@ tcpmon eval --run results/lab/<C1> --run results/lab/<C2> --run results/lab/<C3>
 de Wilson 95%, precisão, F1, latência mediana e p95 por configuração e classe),
 `episodios.csv`, `mcnemar.csv` (pares C1×C2, C2×C3, C1×C3 com correção de Holm e ΔP_D com IC
 de Newcombe), `falsos_alarmes.csv`, `transicao.csv`, `desempenho.csv`, `inclusao.json` e
-`resumo.md`.
+`resumo.md`. A inclusão C1 ⊆ C2 é verificada por traço rejeitado e C2 ⊆ C3 por alerta
+idêntico (D33); a divergência por janela entre C1 e C2 é reportada à parte.
 
 ### Validação analítica e reprodução completa
 
