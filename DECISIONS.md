@@ -91,3 +91,85 @@ Chaves adicionadas ao esquema do guia:
 
 O ambiente da equipe usa Python 3.15 (o guia pede ≥ 3.11). As versões das dependências
 estão fixadas no `pyproject.toml` a partir da primeira instalação que funcionou.
+
+### D11 — Ponto de captura na ponte Docker
+2026-11-25 · fase 3 · aberta
+
+O `tcpdump` roda num container com `--network host` e captura a ponte da rede interna do
+laboratório (equivalente a uma porta espelhada no switch): vê o tráfego de todos os hosts,
+inclusive dos alvos da varredura. `snaplen` = 128 bytes (cabeçalhos completos). As
+estatísticas do `tcpdump` (descartes do kernel) vão para o metadado.
+
+### D12 — Isolamento e destino dos SYN-ACK forjados
+2026-11-25 · fase 3 · aberta
+
+A rede é `--internal` (sem rota padrão). O servidor recebe a rota `10.99.0.0/16 via
+<atacante>`: os SYN-ACK destinados às origens forjadas aparecem na captura e chegam ao
+atacante, que tem `net.ipv4.ip_forward = 0` e os descarta em silêncio (sem RST e sem ICMP).
+Sem essa rota o kernel do servidor não enviaria os SYN-ACK (rede inalcançável) e a captura
+não os mostraria. Os containers do Docker vêm com `ip_forward = 1`; por isso o atacante
+recebe a sysctl explicitamente.
+
+### D13 — `netem` sem reordenação
+2026-11-25 · fase 3 · aberta
+
+O `netem` com *jitter* reordena pacotes por padrão. Foi adicionada uma fila `pfifo` filha
+(`limit 1000`): o atraso varia, mas a ordem é preservada. Motivo: a decisão D2 pediu
+latência, não reordenação; reordenação é uma limitação discutida à parte no artigo.
+
+### D14 — Backlog do servidor e alvos da varredura
+2026-11-25 · fase 3 · aberta
+
+O servidor HTTP (Python, HTTP/1.0) usa `listen(511)`, o padrão do nginx; as sysctls do
+kernel ficam no padrão (D1). A varredura percorre 20 hosts que escutam na porta 80 sem
+aceitar conexões (o kernel completa o handshake). O atacante não bloqueia RST na varredura:
+o kernel dele reseta cada SYN-ACK, como numa varredura SYN real.
+
+### D15 — Estrutura dos episódios
+2026-11-25 · fase 3 · aberta
+
+Valores em `lab/scenarios/*.yaml`:
+
+- `ack_sem_syn`, `xmas`, `null`, `varredura_horizontal`: um episódio contínuo de 5 min com
+  10 pacotes/s em intervalos fixos (em toda janela de 1 s há pacotes de ataque). Cada
+  pacote usa uma porta de origem nova, de uma faixa exclusiva do tipo de ataque, para que
+  cada pacote seja um fluxo próprio e nenhum caia numa lápide.
+- `xmas` e `null` percorrem as portas de destino 1–1024 do servidor.
+- `handshake_incompleto`: 20 SYNs espaçados de 75 s (> τ_hs), cada SYN um **episódio
+  pontual** (`t_inicio = t_fim` = timestamp capturado do SYN). Motivo: com um episódio
+  contínuo de 5 min, a P_D por janela mediria a taxa de SYNs, não a detecção; e com
+  espaçamento menor que τ_hs o cenário viraria um SYN Flood de baixa taxa.
+- `synflood_baixa` (λ_A ∈ {0,02; 0,05; 0,1; 0,5}) e `synflood_alta` (λ_A ∈ {1; 10; 100}):
+  um episódio de 5 min por taxa. A divisão entre "baixa" e "alta" é só de nomenclatura.
+- 60 s de aquecimento só com tráfego benigno e 120 s (≥ τ_hs + margem) após cada episódio,
+  para que a zona de transição termine antes do próximo episódio.
+
+### D16 — Tempo dos rótulos
+2026-11-25 · fase 3 · aberta
+
+Containers e captura usam o mesmo relógio (kernel do host). Episódios contínuos usam o
+intervalo planejado (`inicio + deslocamento`); episódios pontuais usam o timestamp do
+pacote de ataque no pcap (o plano é o *fallback*). O metadado e a coluna `parametros`
+guardam enviados, capturados e primeiro/último timestamp capturado, para auditoria.
+
+### D17 — O que "reprodutível" significa no laboratório
+2026-11-25 · fase 3 · aberta
+
+A mesma semente produz o mesmo plano (instantes das conexões benignas e todos os pacotes de
+ataque), verificável pelo `plano_sha256` do metadado. O pcap não é idêntico byte a byte entre
+execuções: a temporização do kernel e do `netem` varia.
+
+### D18 — Orquestração sem `docker compose`
+2026-11-25 · fase 3 · aberta
+
+O plugin `docker compose` não está instalado no ambiente da equipe. `lab/generate.py` cria a
+topologia com a CLI `docker`; `lab/docker-compose.yml` descreve a mesma topologia para
+inspeção manual. O guia usa `--cenario/--semente` numa tabela e `--scenario/--seed` noutra;
+os dois pares são aceitos.
+
+### D19 — Chave de associação do handshake incompleto
+2026-11-25 · fase 3 · aberta
+
+Seguindo o guia, a chave do `handshake_incompleto` é o servidor alvo. Consequência: um alerta
+de tráfego benigno para o mesmo servidor, na mesma janela, também conta como detecção.
+O mesmo vale para o SYN Flood.

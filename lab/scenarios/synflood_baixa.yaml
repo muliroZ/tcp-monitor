@@ -1,0 +1,9 @@
+base: _base.yaml
+nome: synflood_baixa
+descricao: SYN Flood com origens forjadas em 10.99.0.0/16 e chegadas Poisson, taxas baixas da grade.
+blocos:
+  - tipo: synflood
+    classe: synflood_baixa
+    taxas_s: [0.02, 0.05, 0.1, 0.5]
+    duracao_s: 300
+    porta_destino: 80

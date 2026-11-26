@@ -1,0 +1,71 @@
+# Topologia do laboratório, para inspeção manual (`docker compose -f lab/docker-compose.yml up`).
+#
+# A geração reprodutível NÃO depende deste arquivo: `python lab/generate.py` cria a mesma
+# topologia com a CLI do Docker, aplica netem/iptables/rotas, captura na ponte e remove tudo
+# ao final. Os valores abaixo espelham lab/scenarios/_base.yaml.
+#
+# Segurança: a rede é `internal: true` (sem rota para fora do host). Nunca aponte o
+# atacante para um endereço real.
+
+name: tcpmon-lab
+
+networks:
+  lab:
+    internal: true
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: tcpmonlab0
+    ipam:
+      config:
+        - subnet: 10.77.0.0/24
+
+x-imagem: &imagem
+  build: .
+  image: tcpmon-lab:lab
+  init: true
+  volumes:
+    - ../data/lab/manual:/data:z
+
+services:
+  servidor:
+    <<: *imagem
+    cap_add: [NET_ADMIN]
+    command: >
+      sh -c "ip route add 10.99.0.0/16 via 10.77.0.30 &&
+             exec python /lab/server.py --porta 80 --backlog 511"
+    networks:
+      lab: {ipv4_address: 10.77.0.10}
+
+  cliente:
+    <<: *imagem
+    cap_add: [NET_ADMIN]
+    command: >
+      sh -c "tc qdisc add dev eth0 root handle 1: netem delay 50ms 20ms distribution normal &&
+             tc qdisc add dev eth0 parent 1:1 handle 10: pfifo limit 1000 &&
+             exec sleep infinity"
+    networks:
+      lab: {ipv4_address: 10.77.0.20}
+
+  atacante:
+    <<: *imagem
+    cap_add: [NET_ADMIN, NET_RAW]
+    sysctls:
+      net.ipv4.ip_forward: "0"
+    command: >
+      sh -c "iptables -A OUTPUT -p tcp --tcp-flags RST RST --sport 50000:50999 -j DROP &&
+             exec sleep infinity"
+    networks:
+      lab: {ipv4_address: 10.77.0.30}
+
+  alvo00:
+    <<: *imagem
+    command: python /lab/listener.py --porta 80 --backlog 128
+    networks:
+      lab: {ipv4_address: 10.77.0.100}
+
+  captura:
+    <<: *imagem
+    network_mode: host
+    cap_add: [NET_RAW, NET_ADMIN]
+    command: tcpdump -i tcpmonlab0 -s 128 -U -n -w /data/captura.pcap
+    depends_on: [servidor, cliente, atacante, alvo00]

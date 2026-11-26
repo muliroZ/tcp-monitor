@@ -1,0 +1,8 @@
+# Fixtures pequenas (< 1 MB) para testes de integração: mesmas regras, durações curtas.
+base: ../_base.yaml
+benigno:
+  taxa_conexoes_s: 1.0
+aquecimento_s: 3
+intervalo_s: 5
+alvos:
+  n: 5

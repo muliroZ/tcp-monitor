@@ -1,0 +1,128 @@
+{
+  "cenario": "fixture_varredura",
+  "semente": 42,
+  "plano_sha256": "a096f2d5c736dca8f232babe751249c6eb2456f5224888584ecffd8f11e91bee",
+  "pcap": "fixture_varredura_s42.pcap",
+  "pcap_sha256": "943987ebd57682117d14ad330f5a938f32d76af9efb434219580e313e4b0491c",
+  "inicio_plano": 1795651508.838593,
+  "duracao_plano_s": 13.0,
+  "sysctls_servidor": {
+    "net.ipv4.tcp_synack_retries": 5,
+    "net.ipv4.tcp_syncookies": 1,
+    "net.ipv4.tcp_max_syn_backlog": 1024
+  },
+  "tau_hs_s": 63.0,
+  "tau_hs_origem": "net.ipv4.tcp_synack_retries=5 lido do container servidor; RTO inicial 1.0 s",
+  "rto_inicial_s": 1.0,
+  "cenario_config": {
+    "imagem": "tcpmon-lab",
+    "rede": {
+      "sub_rede": "10.77.0.0/24"
+    },
+    "servidor": {
+      "ip": "10.77.0.10",
+      "porta": 80,
+      "backlog": 511
+    },
+    "cliente": {
+      "ip": "10.77.0.20"
+    },
+    "atacante": {
+      "ip": "10.77.0.30"
+    },
+    "alvos": {
+      "primeiro_ip": "10.77.0.100",
+      "n": 5,
+      "porta": 80,
+      "backlog": 128
+    },
+    "faixa_forjada": "10.99.0.0/16",
+    "netem": {
+      "delay_ms": 50,
+      "jitter_ms": 20,
+      "distribuicao": "normal",
+      "limite_fila": 1000
+    },
+    "captura": {
+      "snaplen": 128
+    },
+    "rto_inicial_s": 1.0,
+    "benigno": {
+      "taxa_conexoes_s": 1.0,
+      "timeout_s": 10.0
+    },
+    "aquecimento_s": 3,
+    "intervalo_s": 5,
+    "portas_origem": {
+      "ack_sem_syn": [
+        30000,
+        39999
+      ],
+      "xmas": [
+        40000,
+        44999
+      ],
+      "null": [
+        45000,
+        49999
+      ],
+      "handshake_incompleto": [
+        50000,
+        50999
+      ],
+      "varredura_horizontal": [
+        51000,
+        59999
+      ]
+    },
+    "espera_inicio_s": 3.0,
+    "espera_logs_s": 60.0,
+    "nome": "fixture_varredura",
+    "descricao": "Varredura horizontal curta.",
+    "blocos": [
+      {
+        "tipo": "varredura_horizontal",
+        "classe": "varredura_horizontal",
+        "duracao_s": 5,
+        "taxa_pps": 5,
+        "porta_destino": 80
+      }
+    ]
+  },
+  "imagem_docker": "sha256:97e71d61676286bcce08112bb4487731cb3de0081581bdd2573a00f26e30b9b5",
+  "captura": {
+    "capturados": 268,
+    "recebidos_pelo_filtro": 268,
+    "descartados_pelo_kernel": 0
+  },
+  "leitura": {
+    "pacotes_lidos": 268,
+    "pacotes_tcp_aceitos": 205,
+    "descartados_por_tipo": {
+      "nao_ip": 41,
+      "nao_tcp": 22
+    },
+    "descartados_total": 63,
+    "inversoes_ordem": 0
+  },
+  "benigno": {
+    "conexoes_planejadas": 11,
+    "conexoes_registradas": 11,
+    "erros": {}
+  },
+  "ataque": [
+    {
+      "episodio": "e001",
+      "enviados": 25,
+      "t_primeiro": 1795651511.859224,
+      "t_ultimo": 1795651516.640076
+    }
+  ],
+  "ambiente": {
+    "host_kernel": "7.3.4-300.fc45.x86_64",
+    "docker": "29.9.3",
+    "python_gerador": "3.15.2",
+    "commit_git": "1927cc98efb6938e1e7ad5d9e8b00b919dd12a03"
+  },
+  "duracao_geracao_s": 21.799968242645264
+}

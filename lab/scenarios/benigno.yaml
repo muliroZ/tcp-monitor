@@ -1,0 +1,5 @@
+base: _base.yaml
+nome: benigno
+descricao: Apenas tráfego benigno (cliente HTTP com chegadas Poisson de taxa lambda_L).
+duracao_benigna_s: 300
+blocos: []

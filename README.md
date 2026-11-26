@@ -23,7 +23,7 @@ as curvas teóricas do modelo M/G/∞.
 | --- | --- | --- |
 | 1 | Ambiente | ✅ |
 | 2 | Leitura e fluxos | ✅ |
-| 3 | Laboratório (Docker) | ⏳ |
+| 3 | Laboratório (Docker) | ✅ |
 | 4 | Camada 1 — AFD | ⏳ |
 | 5 | Camada 2 — Autômato temporizado | ⏳ |
 | 6 | Camada 3 — Agregador e calibração | ⏳ |
@@ -57,6 +57,35 @@ fluxo 10.0.0.1:40000-10.0.0.2:80#0  cliente=10.0.0.1:40000  servidor=10.0.0.2:80
   0.010000  S.SYNACK
   0.020000  C.ACK
 ```
+
+### Laboratório
+
+Gera tráfego benigno e de ataque em containers Docker numa rede **interna** (sem acesso
+externo), captura na ponte da rede e grava pcap, rótulos e metadado:
+
+```bash
+python lab/generate.py --cenario xmas --semente 42          # ou --scenario/--seed
+python lab/generate.py --cenario teste --semente 42         # todos os ataques em sequência (~104 min)
+python lab/generate.py --cenario calibracao --semente 43    # só benigno, 15 min
+python lab/generate.py --cenario teste --semente 42 --apenas-plano   # só o plano, sem Docker
+```
+
+Saída em `data/lab/` (fora do Git): `<cenario>_s<semente>.pcap`, `..._labels.csv`,
+`....meta.json` (sysctls do servidor, τ_hs e sua origem, estatísticas da captura, hash do
+plano) e `....plano.json`.
+
+| Cenário | Classe | Como é gerado | Chave |
+| --- | --- | --- | --- |
+| benigno / calibracao | — | Cliente HTTP, chegadas Poisson λ_L = 5/s, netem 50 ± 20 ms | — |
+| ack_sem_syn | sequência | ACK sem handshake, 10 pacotes/s por 5 min | origem |
+| xmas | flags inválidas | FIN+PSH+URG, 10 pacotes/s por 5 min | origem |
+| null | flags inválidas | sem flags, 10 pacotes/s por 5 min | origem |
+| handshake_incompleto | temporal | 20 SYNs isolados (75 s entre eles), RST bloqueado | servidor |
+| synflood_baixa / synflood_alta | volumétrica | SYNs forjados de 10.99.0.0/16, Poisson λ_A ∈ {0,02 … 100}/s | servidor |
+| varredura_horizontal | volumétrica | SYN na porta 80 de 20 hosts, 10/s por 5 min | origem |
+
+Os parâmetros ficam em `lab/scenarios/*.yaml` (herdam de `_base.yaml`). Requisitos: Docker
+com permissão para o usuário; a imagem `tcpmon-lab` é construída automaticamente.
 
 ### Alfabeto
 
