@@ -14,7 +14,7 @@ from conftest import FIXTURES
 
 from tcpmon.config import load_config
 from tcpmon.engine import Engine, ParametrosEngine, SaidaMemoria
-from tcpmon.eval.inclusao import alertas_ausentes
+from tcpmon.eval.inclusao import inclusao_por_traco, rejeitadas_de_fluxos
 from tcpmon.io.labels import read_labels
 from tcpmon.io.pcap_reader import ReadCounters, read_packets
 from conftest import REPO
@@ -62,10 +62,15 @@ def test_c2_expira_cada_syn_de_ataque(temporal):
         assert a.camada == 2 and a.t_evidencia == f.t_syn and a.t_alerta == f.t_syn + TAU
     # O handshake incompleto pontual: t_evidencia é exatamente o t_inicio do episódio.
     for ep in (e for e in rotulos if e.classe == "handshake_incompleto"):
-        assert any(a.t_evidencia == ep.t_inicio and a.servidor.startswith(ep.chave_valor + ":") for a in expirados.values())
+        assert ep.chave_tipo == "origem"  # D34
+        assert any(a.t_evidencia == ep.t_inicio and a.cliente.startswith(ep.chave_valor + ":") for a in expirados.values())
 
 
 @pytest.mark.parametrize("pcap", FIXTURES_TODAS, ids=lambda p: p.stem)
-def test_inclusao_c1_em_c2(pcap):
+def test_inclusao_c1_em_c2_por_traco(pcap):
+    """D33: toda instância rejeitada pela C1 é rejeitada pela C2, tão cedo ou antes."""
     c1, c2 = rodar_pcap(pcap, (1,)), rodar_pcap(pcap, (1, 2))
-    assert alertas_ausentes(c1.alertas, c2.alertas) == []
+    r1 = rejeitadas_de_fluxos(c1.saida.fluxos)
+    if "estrutural" in pcap.name:
+        assert r1, "a fixture estrutural tem instâncias rejeitadas pela C1"
+    assert inclusao_por_traco(r1, rejeitadas_de_fluxos(c2.saida.fluxos)) == []

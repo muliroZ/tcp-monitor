@@ -23,6 +23,7 @@ netem:                        # decisão da equipe (DECISIONS.md D2)
   jitter_ms: 20
   distribuicao: normal
   limite_fila: 1000
+  fila_filha: pfifo           # D13: fila FIFO filha (sem reordenação); null = sem fila filha
 captura:
   snaplen: 128
 rto_inicial_s: 1.0            # para derivar tau_hs de net.ipv4.tcp_synack_retries

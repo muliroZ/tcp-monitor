@@ -27,10 +27,15 @@ as curvas teóricas do modelo M/G/∞.
 | 4 | Camada 1 — AFD | ✅ |
 | 5 | Camada 2 — Autômato temporizado | ✅ |
 | 6 | Camada 3 — Agregador e calibração | ✅ |
-| 7 | Avaliação | ⏳ |
-| 8 | Validação analítica | ⏳ |
-| 9 | CIC-IDS2017 | bloqueada por pendências |
-| 10 | Baselines (opcional) | — |
+| 7 | Avaliação | ✅ |
+| 8 | Validação analítica | ✅ |
+| 9 | CIC-IDS2017 e CIC-DDoS2019 (D37) | bloqueada: aguardando a equipe (servidores e pcaps) |
+| 10 | Baselines Zeek e Suricata (D41) | depois da fase 9 |
+
+Decisões abertas com a equipe sobre os resultados do laboratório: D52 (o `netem` com jitter
+reordena pacotes, e T efetivo ≈ 39 ms), D53 (P_D teórica com a taxa realizada), D54
+(dependência entre janelas nos intervalos de Wilson) e D55 (efeito de W no k empírico). Ver
+[DECISIONS.md](DECISIONS.md).
 
 ## Instalação
 
@@ -50,7 +55,31 @@ tcpmon symbols --pcap captura.pcap            # sequência de símbolos de cada 
 tcpmon run --config configs/experiments/lab.yaml --camadas 1   # executa C1 e grava results/<run_id>/
 tcpmon calibrate --config configs/experiments/lab.yaml --pcap data/lab/calibracao_s43.pcap
 tcpmon run --config configs/experiments/lab.yaml --calibracao results/lab/<run_id>-calib/calibration.json   # C3
+tcpmon eval --run results/lab/<C1> --run results/lab/<C2> --run results/lab/<C3> --rotulos data/lab/teste_s42_labels.csv
 ```
+
+`tcpmon eval` gera, na pasta `eval-<data>/`: `metricas.csv` (TP, FN, FP, TN, P_D e P_FA com IC
+de Wilson 95%, precisão, F1, latência mediana e p95 por configuração e classe),
+`episodios.csv`, `mcnemar.csv` (pares C1×C2, C2×C3, C1×C3 com correção de Holm e ΔP_D com IC
+de Newcombe), `falsos_alarmes.csv`, `transicao.csv`, `desempenho.csv`, `inclusao.json` e
+`resumo.md`. A inclusão C1 ⊆ C2 é verificada por traço rejeitado e C2 ⊆ C3 por alerta
+idêntico (D33); a divergência por janela entre C1 e C2 é reportada à parte.
+
+### Validação analítica e reprodução completa
+
+```bash
+tcpmon analytic --calibracao results/lab/<run_id>-calib --teste results/lab/<C3>
+python experiments/run.py --todos          # gera dados se faltarem, calibra, roda C1/C2/C3, avalia e valida
+```
+
+`tcpmon analytic` estima λ̂_L, Ê[T] e â = λ̂_L·Ê[T] na calibração, confere a lei de Little
+(média dos retratos × â), o índice de dispersão, o qui-quadrado contra Poisson(â) e o KS dos
+intervalos entre SYNs contra a exponencial; ajusta exponencial, log-normal e Weibull a T com
+censura em τ_hs; estima λ̂_A de cada SYN Flood pela faixa forjada e compara as curvas teóricas
+`P_FA(k) = poisson.sf(k, â)` e `P_D(k) = poisson.sf(k, â + b)` (b = λ_A·τ_hs) com os pontos
+empíricos dos retratos estacionários. Grava `analytic.json`, `curvas_roc.csv`,
+`pd_vs_taxa.csv` e `figures/` (`roc_<taxa>.png`, `pd_vs_taxa.png`, `retratos_benignos.png`,
+`tempo_handshake.png`).
 
 `tcpmon run` grava em `results/<run_id>/` (`run_id` = data, hora e hash curto da
 configuração efetiva): `alerts.csv`, `flows.csv`, `counters.json` e `run.json` (configuração
@@ -74,7 +103,7 @@ externo), captura na ponte da rede e grava pcap, rótulos e metadado:
 
 ```bash
 python lab/generate.py --cenario xmas --semente 42          # ou --scenario/--seed
-python lab/generate.py --cenario teste --semente 42         # todos os ataques em sequência (~104 min)
+python lab/generate.py --cenario teste --semente 42         # todos os ataques em sequência (~154 min)
 python lab/generate.py --cenario calibracao --semente 43    # só benigno, 15 min
 python lab/generate.py --cenario teste --semente 42 --apenas-plano   # só o plano, sem Docker
 ```
@@ -89,12 +118,25 @@ plano) e `....plano.json`.
 | ack_sem_syn | sequência | ACK sem handshake, 10 pacotes/s por 5 min | origem |
 | xmas | flags inválidas | FIN+PSH+URG, 10 pacotes/s por 5 min | origem |
 | null | flags inválidas | sem flags, 10 pacotes/s por 5 min | origem |
-| handshake_incompleto | temporal | 20 SYNs isolados (75 s entre eles), RST bloqueado | servidor |
+| handshake_incompleto | temporal | 60 SYNs isolados (75 s entre eles), RST bloqueado; cada SYN é um episódio | origem |
 | synflood_baixa / synflood_alta | volumétrica | SYNs forjados de 10.99.0.0/16, Poisson λ_A ∈ {0,02 … 100}/s | servidor |
 | varredura_horizontal | volumétrica | SYN na porta 80 de 20 hosts, 10/s por 5 min | origem |
 
 Os parâmetros ficam em `lab/scenarios/*.yaml` (herdam de `_base.yaml`). Requisitos: Docker
 com permissão para o usuário; a imagem `tcpmon-lab` é construída automaticamente.
+
+Diagnóstico do atraso efetivo do `netem` (D35, resultado em D52): três variantes de 120 s
+(configurado, sem fila filha, sem jitter), com captura na ponte e dentro do cliente ao mesmo
+tempo. Saída em `results/diagnostico_netem/<data-hora>/`: `diagnostico.json` e
+`diagnostico_netem.png`, com as ECDFs e as referências teóricas.
+
+```bash
+python lab/diagnostico_netem.py --semente 44
+python lab/diagnostico_netem.py --reanalisar results/diagnostico_netem/<data-hora>   # sem Docker
+```
+
+Com jitter, o `netem` reordena pacotes da mesma conexão. O T benigno medido é o menor entre
+os atrasos do ACK puro e do segmento de dados seguinte: cerca de 39 ms, e não 50 ms (D52).
 
 ### Camada 1 — AFD observador
 
@@ -117,14 +159,16 @@ timestamps do pcap; fluxos ainda pendentes no fim da captura ficam `truncado`, s
 ### Camada 3 — agregador e calibração
 
 Ao fim de cada janela `[t0 + i·W, t0 + (i+1)·W)` o agregador tira um retrato de N_s (handshakes
-pendentes por IP de servidor); se N_s > k, alerta `AGG_HANDSHAKE_PENDENTE`. Também conta, por
+pendentes) de cada servidor listado em `agregador.servidores` — lista definida antes de qualquer
+execução sobre o teste (D36) — e, se N_s > k_s, alerta `AGG_HANDSHAKE_PENDENTE`. O limiar k é por
+servidor. Também conta, por
 (IP de origem, porta de destino), os IPs de destino distintos dos fluxos iniciados na janela;
 acima de k_scan, alerta `AGG_VARREDURA_HORIZONTAL`.
 
 `tcpmon calibrate` roda as camadas 1 e 2 sobre o pcap de calibração (só benigno) e grava em
-`calibration.json`: k empírico (menor k com fração de retratos N_s > k ≤ α), k_scan pelo mesmo
-critério, k analítico (menor k com `poisson.sf(k, â) ≤ α`, â = λ̂_L·Ê[T]) e as estimativas por
-servidor. Os experimentos usam o k empírico; o analítico é reportado para comparação.
+`calibration.json`: k_s empírico por servidor (menor k com fração dos retratos do servidor com
+N_s > k ≤ α), k_scan pelo mesmo critério sobre as contagens de varredura, k analítico por servidor
+(menor k com `poisson.sf(k, â_s) ≤ α`, â_s = λ̂_L,s·Ê[T]_s) e as estimativas por servidor. Os experimentos usam o k empírico; o analítico é reportado para comparação.
 
 ### Alfabeto
 
@@ -175,8 +219,14 @@ src/tcpmon/
 ├── monitors/aggregator.py # camada 3
 ├── calibracao.py          # escolha de k e k_scan
 ├── analytic/model.py      # M/G/∞, P_FA(k), P_D(k), k analítico
-└── eval/inclusao.py       # inclusão de alertas entre configurações
+├── analytic/validacao.py  # estimativas, testes de aderência, curvas (tcpmon analytic)
+├── analytic/figuras.py    # figuras do artigo
+├── eval/inclusao.py       # inclusão de alertas entre configurações
+├── eval/windows.py        # janelas, rótulos de janela, detecção, latência
+├── eval/metrics.py        # métricas e tabelas (tcpmon eval)
+└── eval/stats.py          # Wilson, McNemar, Holm, diferença pareada
 lab/                       # laboratório Docker (generate.py, cenários, agentes)
+experiments/run.py         # reproduz todos os resultados
 configs/                   # default.yaml e experimentos
 tests/                     # pytest
 ```

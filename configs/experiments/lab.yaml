@@ -5,7 +5,13 @@ entrada:
   pcap: data/lab/teste_s42.pcap
   rotulos: data/lab/teste_s42_labels.csv
   metadado: null              # usa data/lab/teste_s42.meta.json (tau_hs da sysctl do servidor)
+agregador:
+  servidores: [10.77.0.10]    # D36: o servidor HTTP do laboratório
 saida: results/lab/
 experimento:                  # lido por experiments/run.py
   calibracao_pcap: data/lab/calibracao_s43.pcap
+  # Geração dos dados do laboratório (feita só se os pcaps não existirem ou com --gerar).
+  calibracao_cenario: calibracao
+  calibracao_semente: 43      # sementes diferentes para calibração e teste (guia)
+  teste_cenario: teste
   configuracoes: [[1], [1, 2], [1, 2, 3]]

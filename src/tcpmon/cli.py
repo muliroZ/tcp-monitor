@@ -81,6 +81,23 @@ def _cmd_calibrate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_eval(args: argparse.Namespace) -> int:
+    from tcpmon.eval.metrics import avaliar
+
+    pasta = avaliar(args.run, args.rotulos, args.saida)
+    print(pasta)
+    if not args.quieto:
+        print((pasta / "resumo.md").read_text(encoding="utf-8"))
+    return 0
+
+
+def _cmd_analytic(args: argparse.Namespace) -> int:
+    from tcpmon.analytic.validacao import validar_modelo
+
+    print(validar_modelo(args.calibracao, args.teste, figuras=not args.sem_figuras))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="tcpmon",
@@ -114,6 +131,19 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--camadas", default=None, help="sobrescreve 'camadas' (ex.: 1 ou 1,2 ou 1,2,3)")
     r.add_argument("--saida", default=None, help="sobrescreve a pasta base de saída")
     r.set_defaults(func=_cmd_run)
+
+    e = sub.add_parser("eval", help="gera métricas, intervalos e testes estatísticos de execuções")
+    e.add_argument("--run", action="append", required=True, help="pasta de uma execução (repita para C1, C2, C3)")
+    e.add_argument("--rotulos", required=True, help="labels.csv dos episódios")
+    e.add_argument("--saida", default=None, help="pasta das tabelas (padrão: <pasta da 1ª execução>/../eval-<data>)")
+    e.add_argument("--quieto", action="store_true", help="não imprime o resumo")
+    e.set_defaults(func=_cmd_eval)
+
+    a = sub.add_parser("analytic", help="validação analítica (M/G/∞) e suas figuras")
+    a.add_argument("--calibracao", required=True, help="pasta da calibração (contém calibration.json)")
+    a.add_argument("--teste", required=True, help="pasta de uma execução C3 sobre o pcap de teste")
+    a.add_argument("--sem-figuras", action="store_true", help="não gera as figuras")
+    a.set_defaults(func=_cmd_analytic)
 
     return p
 

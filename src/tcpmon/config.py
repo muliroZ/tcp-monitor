@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import ipaddress
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,7 +45,8 @@ _OBRIGATORIAS = (
 @dataclass(frozen=True)
 class AgregadorCfg:
     granularidade: str
-    k: int | None
+    servidores: tuple[str, ...] | None  # D36
+    k: int | dict[str, int] | None  # um valor para todos ou um k por servidor (D36)
     k_scan: int | None
     calibracao: str | None
 
@@ -137,6 +139,28 @@ def _num(raw: dict[str, Any], chave: str, minimo: float | None = 0.0, estrito: b
     return valor
 
 
+def _servidores(valor: Any) -> tuple[str, ...] | None:
+    if valor is None:
+        return None
+    if not isinstance(valor, (list, tuple)) or not valor:
+        raise ConfigError("'agregador.servidores' precisa ser uma lista não vazia de IPs ou null")
+    out = []
+    for ip in valor:
+        try:
+            out.append(str(ipaddress.ip_address(str(ip))))
+        except ValueError as exc:
+            raise ConfigError(f"'agregador.servidores': IP inválido {ip!r}") from exc
+    if len(set(out)) != len(out):
+        raise ConfigError("'agregador.servidores' tem IPs repetidos")
+    return tuple(out)
+
+
+def _k(valor: Any, chave: str) -> int | dict[str, int] | None:
+    if isinstance(valor, dict):
+        return {str(ipaddress.ip_address(str(ip))): _int_ou_none(v, f"{chave}[{ip}]") for ip, v in valor.items()}
+    return _int_ou_none(valor, chave)
+
+
 def _int_ou_none(valor: Any, chave: str) -> int | None:
     if valor is None:
         return None
@@ -174,7 +198,8 @@ def from_dict(raw: dict[str, Any], origem: str | None = None) -> Config:
         )
     agregador = AgregadorCfg(
         granularidade=str(agg["granularidade"]),
-        k=_int_ou_none(agg["k"], "agregador.k"),
+        servidores=_servidores(agg.get("servidores")),
+        k=_k(agg["k"], "agregador.k"),
         k_scan=_int_ou_none(agg["k_scan"], "agregador.k_scan"),
         calibracao=agg.get("calibracao"),
     )

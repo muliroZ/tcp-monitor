@@ -13,7 +13,9 @@ alfa: 0.01
 camadas: [1, 2, 3]          # [1] = C1, [1, 2] = C2, [1, 2, 3] = C3
 agregador:
   granularidade: servidor_ip
-  k: null                   # preenchido por tcpmon calibrate (calibration.json)
+  servidores: null          # D36: IPs monitorados pelo detector de handshakes pendentes, definidos
+                            # antes de qualquer execução sobre o teste (obrigatório com a camada 3)
+  k: null                   # preenchido por tcpmon calibrate (calibration.json): um k por servidor
   k_scan: null
   calibracao: null          # caminho de um calibration.json; alternativa a --calibracao
 entrada:

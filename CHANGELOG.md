@@ -3,6 +3,50 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/);
 versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.5.0] — 2026-11-26
+
+Fases 7 (avaliação) e 8 (validação analítica).
+
+### Adicionado
+- `tcpmon eval`: rotulagem de janelas (positivas, transição, benignas), TP/FN/FP/TN, P_D e
+  P_FA com IC de Wilson, precisão, F1, latência (mediana e p95), desempenho, McNemar (exato
+  ou corrigido) com Holm e ΔP_D com IC de Newcombe para dados pareados; tabelas CSV e
+  `resumo.md`.
+- `tcpmon analytic`: λ̂_L, Ê[T], â, lei de Little, índice de dispersão, qui-quadrado e KS,
+  ajuste de T com censura, λ̂_A por episódio, curvas ROC teóricas com pontos empíricos e
+  figuras.
+- `experiments/run.py --todos`: reprodução completa com um comando.
+- Testes estatísticos conferidos contra valores publicados (Wilson, McNemar, Holm, Newcombe).
+- Decisões D42–D50 (implementação das fases 7 e 8).
+
+### Corrigido
+- Diagnóstico do `netem`: a contagem de reordenação comparava duas capturas pós-qdisc; pacotes
+  idênticos passam a ser pareados pela ordem de ocorrência; sinal da diferença na entrada.
+- `rejeitadas_de_csv` lê `flows.csv` como texto (avisos de tipos mistos do pandas).
+
+### Alterado
+- D34: `handshake_incompleto` com chave de associação por origem e 60 SYNs (era servidor e 20);
+  a captura `teste` passa a durar ~154 min. Fixture temporal regenerada.
+- D33: inclusão C1 ⊆ C2 verificada por traço rejeitado (mesma chave e instante do primeiro
+  pacote, `t_alerta` da C2 ≤ C1); a comparação por alerta idêntico vira o relatório de
+  divergência por janela. C2 ⊆ C3 continua por alerta idêntico.
+- D36: `agregador.servidores` (lista de IPs monitorados, obrigatória com o agregador), retratos
+  só desses servidores desde a primeira janela, k por servidor na calibração e no agregador,
+  P_FA por servidor na avaliação (`pfa_por_servidor.csv`) e na validação analítica, ROC por
+  servidor.
+- D35 (diagnóstico 1): estatísticas e figura de T separadas por `motivo_fim_pendente`.
+- D35 (diagnósticos 2 e 3): `lab/diagnostico_netem.py`. Captura na ponte e dentro do cliente
+  ao mesmo tempo, em três variantes (configurado, sem fila filha, sem jitter), com ECDFs e as
+  referências teóricas de um atraso e do mínimo de dois atrasos, e `--reanalisar` para refazer
+  a análise sem Docker. O cliente do laboratório registra a porta local de cada conexão, e a
+  fila filha do `netem` passa a ser explícita em `_base.yaml`.
+- D53: `pd_vs_taxa.csv`, `analytic.json` e `pd_vs_taxa.png` trazem também a P_D teórica com a
+  taxa realizada em cada episódio (λ̂_A).
+- D52: resultado do diagnóstico. O `netem` com jitter reordena o ACK puro e o segmento de dados
+  seguinte em cerca de 50% das conexões, com ou sem fila filha. Por isso T ≈ 39 ms (o mínimo
+  de dois atrasos), e não 50 ms. A verificação da D13 não se sustenta. Fica pendente com a
+  equipe.
+
 ## [0.4.0] — 2026-11-25
 
 Fase 6: camada 3 (agregador) e calibração.
