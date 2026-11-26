@@ -98,6 +98,10 @@ def pd_vs_taxa(pasta: Path, pdt_todos: pd.DataFrame) -> None:
 def _pd_vs_taxa(pasta: Path, pdt: pd.DataFrame, srv: str, k_usado: int, varios: bool) -> None:
     fig, ax = plt.subplots(figsize=(5.6, 4.2))
     ax.plot(pdt["lambda_A"], pdt["P_D_teorica"], color=AZUL, linewidth=2, marker="o", markersize=4, label="teórica")
+    if "P_D_teorica_lambda_estimado" in pdt and pdt["P_D_teorica_lambda_estimado"].notna().any():
+        # D53: teórica com a taxa realizada de cada episódio, no x nominal do episódio.
+        ax.plot(pdt["lambda_A"], pdt["P_D_teorica_lambda_estimado"], color=AZUL, linestyle="none", marker="D",
+                markersize=6, markerfacecolor="white", markeredgewidth=1.5, label="teórica com λ̂_A do episódio")
     emp = pdt[pdt["P_D_empirica"].notna()]
     yerr = np.clip(np.array([emp["P_D_empirica"] - emp["P_D_ic_inf"], emp["P_D_ic_sup"] - emp["P_D_empirica"]], dtype=float), 0, None)
     ax.errorbar(emp["lambda_A"], emp["P_D_empirica"], yerr=yerr, fmt="o", markersize=6, color=LARANJA,

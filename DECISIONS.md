@@ -581,3 +581,41 @@ reutilizadas são excluídas: 19 na variante configurada, 0 sem fila filha, 1 se
 
 **Pendente com a equipe:** manter os dados como estão (reordenação reportada como limitação)
 ou mudar o aparato para cumprir a D13 e refazer as capturas.
+
+### D53 — P_D teórica também com a taxa realizada do episódio
+2026-11-26 · fase 8 · aberta
+
+O guia define b = λ_A × τ_hs com o λ_A do gerador e pede para reportar λ̂_A junto. As chegadas
+de ataque são Poisson, então o número de SYNs de um episódio de 300 s varia: na captura `teste`
+(semente 42), o episódio de λ_A = 0,05/s teve 9 SYNs forjados (λ̂_A = 0,03/s) em vez dos cerca
+de 15 esperados. A comparação pedida pelo guia (P_D teórica com λ_A nominal) continua igual.
+`pd_vs_taxa.csv` e `pd_no_k_escolhido` em `analytic.json` ganham `lambda_A_estimado` e
+`P_D_teorica_lambda_estimado` = `poisson.sf(k, â + λ̂_A · τ_hs)`, e `pd_vs_taxa.png` mostra
+esse valor como losango vazado. λ̂_A é estimado no episódio inteiro, pelos fluxos da faixa
+forjada. Motivo: separar o erro do modelo da variação amostral do gerador.
+
+### D54 — Dependência entre janelas e intervalos de Wilson
+2026-11-26 · fase 7–8 · aberta · sem mudança no código
+
+O guia pede intervalos de Wilson para P_D e P_FA por janela, e o Wilson supõe janelas
+independentes. Não são: um SYN de ataque fica pendente τ_hs = 63 s e entra em cerca de 63
+retratos seguidos com W = 1 s; um episódio de SYN Flood a 0,02/s tem uns 6 SYNs. Na prática, os
+237 retratos estacionários desse episódio carregam bem menos informação do que 237 ensaios
+independentes, e o IC de Wilson subestima a incerteza, principalmente nas taxas baixas e na
+P_FA do agregador. O mesmo vale, em menor grau, para o McNemar sobre janelas pareadas.
+Mantido como o guia pede. Opções para a equipe: reportar a limitação; acrescentar ICs por
+bootstrap em blocos (blocos ≥ τ_hs); ou repetir os episódios de taxa baixa com várias sementes
+e usar o episódio como unidade.
+
+### D55 — Efeito de W na calibração do k empírico
+2026-11-26 · fase 6–8 · aberta · sem mudança no código
+
+Os retratos são tirados no fim de cada janela, então a calibração de 15 min rende 903
+retratos com W = 1 s, 180 com W = 5 s e 90 com W = 10 s. Com α = 0,01, o k empírico sai 2 com
+W = 1 s e 1 com W = 5 s e 10 s; o k analítico é 2 nos três casos. Com k = 1, a P_FA do
+agregador no teste é 3/191 = 0,016 (W = 5 s) e 2/57 = 0,035 (W = 10 s), acima de α, mas de
+acordo com a teoria para k = 1 (`poisson.sf(1, â)` = 0,0169). Com 90 ou 180 retratos, o
+quantil 1 − α = 0,99 fica mal estimado: no máximo 0 ou 1 retrato acima de k. Mantido como o
+guia pede (k empírico da calibração, mesmo W). Para decidir com a equipe: tirar os retratos da
+calibração com W = 1 s em qualquer configuração, aumentar a calibração, ou usar o k analítico
+quando houver poucos retratos.

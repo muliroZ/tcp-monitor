@@ -45,8 +45,13 @@ def rejeitadas_de_fluxos(fluxos: Iterable) -> list[Rejeitada]:
 
 def rejeitadas_de_csv(caminho: str | Path) -> list[Rejeitada]:
     """Instâncias rejeitadas a partir de ``flows.csv`` de uma execução."""
-    df = pd.read_csv(caminho, usecols=["fluxo", "chave", "inicio", "removido_em", "motivo_alerta"])
-    df = df[df["motivo_alerta"].notna() & (df["motivo_alerta"] != "")]
+    df = pd.read_csv(
+        caminho,
+        usecols=["fluxo", "chave", "inicio", "removido_em", "motivo_alerta"],
+        dtype={"fluxo": str, "chave": str, "motivo_alerta": str},
+        keep_default_na=False,
+    )
+    df = df[df["motivo_alerta"] != ""]
     return [
         Rejeitada(r.chave, float(r.inicio), float(r.removido_em), r.motivo_alerta, r.fluxo)
         for r in df.itertuples(index=False)

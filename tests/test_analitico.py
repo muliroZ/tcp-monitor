@@ -64,6 +64,13 @@ def test_analytic_ponta_a_ponta(tmp_path):
     assert res["servidores"] == ["10.77.0.10"] and res["k_empirico"]["10.77.0.10"] == srv["k"]
     assert "10.77.0.10" in res["pfa_por_servidor"]
     assert srv["T_por_motivo_fim_pendente"]  # D35, diagnóstico 1
+    # D53: P_D teórica também com a taxa realizada do episódio (b̂ = λ̂_A · τ_hs).
+    from tcpmon.analytic.model import p_d
+
+    ep = res["pd_no_k_escolhido"][0]
+    lam_hat = res["syn_flood"][0]["lambda_A_estimado"]
+    assert ep["lambda_A_estimado"] == pytest.approx(lam_hat)
+    assert ep["P_D_teorica_lambda_estimado"] == pytest.approx(p_d(ep["k"], srv["a"], lam_hat * 63.0))
     for fig in ("roc_5.png", "pd_vs_taxa.png", "retratos_benignos.png", "tempo_handshake.png", "tempo_handshake_por_motivo.png"):
         assert (c3 / "figures" / fig).is_file(), fig
     assert (c3 / "curvas_roc.csv").is_file()
