@@ -161,8 +161,9 @@ def _bloco_handshake(bloco, cen, t, cont, idx_bloco):
                 "inicio_s": off,
                 "fim_s": off,
                 "pontual": True,
-                "chave_tipo": "servidor",
-                "chave_valor": srv["ip"],
+                # D34: chave por origem (o atacante envia do próprio IP).
+                "chave_tipo": "origem",
+                "chave_valor": atk["ip"],
                 "parametros": {"tipo": "handshake_incompleto", "espacamento_s": esp, "indice": j, "bloco": idx_bloco},
                 "pacotes": [[off, atk["ip"], portas[j], srv["ip"], int(bloco["porta_destino"]), SYN]],
             }

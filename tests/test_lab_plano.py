@@ -85,10 +85,11 @@ def test_handshake_incompleto_episodios_pontuais_isolados():
     cen = gen.carregar_cenario("handshake_incompleto")
     plano = gen.construir_plano(cen, 42)
     eps = plano["episodios"]
-    assert len(eps) == cen["blocos"][0]["n_syn"]
+    assert len(eps) == cen["blocos"][0]["n_syn"] == 60  # D34
     for e in eps:
         assert e["pontual"] and e["inicio_s"] == e["fim_s"] and len(e["pacotes"]) == 1
         assert e["pacotes"][0][1] == cen["atacante"]["ip"]
+        assert e["chave_tipo"] == "origem" and e["chave_valor"] == cen["atacante"]["ip"]  # D34
     lo, hi = cen["portas_origem"]["handshake_incompleto"]
     assert all(lo <= e["pacotes"][0][2] <= hi for e in eps)
 

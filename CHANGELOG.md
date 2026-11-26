@@ -19,6 +19,10 @@ Fases 7 (avaliação) e 8 (validação analítica).
 - Testes estatísticos conferidos contra valores publicados (Wilson, McNemar, Holm, Newcombe).
 - Decisões D42–D50 (implementação das fases 7 e 8).
 
+### Alterado
+- D34: `handshake_incompleto` com chave de associação por origem e 60 SYNs (era servidor e 20);
+  a captura `teste` passa a durar ~154 min. Fixture temporal regenerada.
+
 ## [0.4.0] — 2026-11-25
 
 Fase 6: camada 3 (agregador) e calibração.
