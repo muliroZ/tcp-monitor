@@ -222,3 +222,23 @@ Além das colunas do guia: `t_primeiro_syn`, `t_fim_pendente` e `motivo_fim_pend
 (necessárias para estimar T na validação analítica), `removido_em`, `motivo_fim`
 (`rejeicao`, `inatividade`, `reuso_de_porta`, `syn_em_midstream`, `fim_da_captura`) e
 `motivo_alerta`.
+
+### D26 — Exceção teórica à inclusão C1 ⊆ C2 (levar à equipe)
+2026-11-25 · fase 5 · aberta
+
+Seguindo o guia, um fluxo que expira na camada 2 vai para ⊥, é removido e vira lápide. Na
+C1 o mesmo fluxo continua vivo (sem prazo). Se, **depois** de τ_hs, chegar a essa chave um
+pacote que a C1 rejeita (por exemplo, flags inválidas), a C1 emite um alerta que a C2 não
+emite (na C2 o pacote cai na lápide e é ignorado). De forma análoga, um SYN tardio abre
+uma instância nova na C2 e não na C1, e a numeração de instâncias diverge. A inclusão
+estrita só vale quando nenhum pacote anômalo chega a um fluxo já expirado. Nada foi
+alterado para esconder o caso: `tcpmon.eval.inclusao.alertas_ausentes` lista qualquer
+violação, e a avaliação a reporta. Nas fixtures do laboratório não há violação.
+
+### D27 — Guarda temporal
+2026-11-25 · fase 5 · aberta
+
+Como os prazos ≤ t disparam antes de cada pacote, a guarda x ≤ τ_hs de `C.ACK`/`C.FIN` em
+`SYNACK_VISTO` nunca falha. Ela continua implementada; se falhar, o fluxo expira com o
+mesmo alerta da transição temporizada e o contador `guarda_temporal_violada` registra o
+ocorrido (esperado: 0).
