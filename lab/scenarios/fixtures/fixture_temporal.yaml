@@ -1,0 +1,7 @@
+base: _fixture.yaml
+nome: fixture_temporal
+descricao: Handshakes incompletos isolados e um SYN Flood curto; cauda maior que tau_hs para ver a expiração.
+intervalo_s: 70
+blocos:
+  - {tipo: handshake_incompleto, classe: handshake_incompleto, n_syn: 2, espacamento_s: 4, porta_destino: 80}
+  - {tipo: synflood, classe: synflood_alta, taxas_s: [5], duracao_s: 10, porta_destino: 80}

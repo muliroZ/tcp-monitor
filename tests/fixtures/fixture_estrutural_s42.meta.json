@@ -1,0 +1,160 @@
+{
+  "cenario": "fixture_estrutural",
+  "semente": 42,
+  "plano_sha256": "d04620823175fe263a4b61c388576148d3427ba8ab55e3040751fd06241e0091",
+  "pcap": "fixture_estrutural_s42.pcap",
+  "pcap_sha256": "32c8fdb963362d6f598d68bb4c224c781005677b8453e5670728f2ebddbe9c2e",
+  "inicio_plano": 1795651442.4983773,
+  "duracao_plano_s": 33.0,
+  "sysctls_servidor": {
+    "net.ipv4.tcp_synack_retries": 5,
+    "net.ipv4.tcp_syncookies": 1,
+    "net.ipv4.tcp_max_syn_backlog": 1024
+  },
+  "tau_hs_s": 63.0,
+  "tau_hs_origem": "net.ipv4.tcp_synack_retries=5 lido do container servidor; RTO inicial 1.0 s",
+  "rto_inicial_s": 1.0,
+  "cenario_config": {
+    "imagem": "tcpmon-lab",
+    "rede": {
+      "sub_rede": "10.77.0.0/24"
+    },
+    "servidor": {
+      "ip": "10.77.0.10",
+      "porta": 80,
+      "backlog": 511
+    },
+    "cliente": {
+      "ip": "10.77.0.20"
+    },
+    "atacante": {
+      "ip": "10.77.0.30"
+    },
+    "alvos": {
+      "primeiro_ip": "10.77.0.100",
+      "n": 5,
+      "porta": 80,
+      "backlog": 128
+    },
+    "faixa_forjada": "10.99.0.0/16",
+    "netem": {
+      "delay_ms": 50,
+      "jitter_ms": 20,
+      "distribuicao": "normal",
+      "limite_fila": 1000
+    },
+    "captura": {
+      "snaplen": 128
+    },
+    "rto_inicial_s": 1.0,
+    "benigno": {
+      "taxa_conexoes_s": 1.0,
+      "timeout_s": 10.0
+    },
+    "aquecimento_s": 3,
+    "intervalo_s": 5,
+    "portas_origem": {
+      "ack_sem_syn": [
+        30000,
+        39999
+      ],
+      "xmas": [
+        40000,
+        44999
+      ],
+      "null": [
+        45000,
+        49999
+      ],
+      "handshake_incompleto": [
+        50000,
+        50999
+      ],
+      "varredura_horizontal": [
+        51000,
+        59999
+      ]
+    },
+    "espera_inicio_s": 3.0,
+    "espera_logs_s": 60.0,
+    "nome": "fixture_estrutural",
+    "descricao": "ACK sem SYN, Xmas e NULL em episódios curtos.",
+    "blocos": [
+      {
+        "tipo": "ack_sem_syn",
+        "classe": "ack_sem_syn",
+        "duracao_s": 5,
+        "taxa_pps": 4,
+        "porta_destino": 80
+      },
+      {
+        "tipo": "xmas",
+        "classe": "xmas",
+        "duracao_s": 5,
+        "taxa_pps": 4,
+        "portas_destino": [
+          1,
+          1024
+        ]
+      },
+      {
+        "tipo": "null",
+        "classe": "null",
+        "duracao_s": 5,
+        "taxa_pps": 4,
+        "portas_destino": [
+          1,
+          1024
+        ]
+      }
+    ]
+  },
+  "imagem_docker": "sha256:791ce8ce828601e19406a07de8ce186dffdf4d79ecd5163e1bf636c9dc032f9a",
+  "captura": {
+    "capturados": 500,
+    "recebidos_pelo_filtro": 500,
+    "descartados_pelo_kernel": 0
+  },
+  "leitura": {
+    "pacotes_lidos": 500,
+    "pacotes_tcp_aceitos": 455,
+    "descartados_por_tipo": {
+      "nao_ip": 10,
+      "nao_tcp": 35
+    },
+    "descartados_total": 45,
+    "inversoes_ordem": 0
+  },
+  "benigno": {
+    "conexoes_planejadas": 28,
+    "conexoes_registradas": 28,
+    "erros": {}
+  },
+  "ataque": [
+    {
+      "episodio": "e001",
+      "enviados": 20,
+      "t_primeiro": 1795651445.5250678,
+      "t_ultimo": 1795651450.2524915
+    },
+    {
+      "episodio": "e002",
+      "enviados": 20,
+      "t_primeiro": 1795651455.5000281,
+      "t_ultimo": 1795651460.2491512
+    },
+    {
+      "episodio": "e003",
+      "enviados": 20,
+      "t_primeiro": 1795651465.4991562,
+      "t_ultimo": 1795651470.2497025
+    }
+  ],
+  "ambiente": {
+    "host_kernel": "7.3.4-300.fc45.x86_64",
+    "docker": "29.9.3",
+    "python_gerador": "3.15.2",
+    "commit_git": "1927cc98efb6938e1e7ad5d9e8b00b919dd12a03"
+  },
+  "duracao_geracao_s": 40.06145787239075
+}
