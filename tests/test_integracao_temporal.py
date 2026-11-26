@@ -62,7 +62,8 @@ def test_c2_expira_cada_syn_de_ataque(temporal):
         assert a.camada == 2 and a.t_evidencia == f.t_syn and a.t_alerta == f.t_syn + TAU
     # O handshake incompleto pontual: t_evidencia é exatamente o t_inicio do episódio.
     for ep in (e for e in rotulos if e.classe == "handshake_incompleto"):
-        assert any(a.t_evidencia == ep.t_inicio and a.servidor.startswith(ep.chave_valor + ":") for a in expirados.values())
+        assert ep.chave_tipo == "origem"  # D34
+        assert any(a.t_evidencia == ep.t_inicio and a.cliente.startswith(ep.chave_valor + ":") for a in expirados.values())
 
 
 @pytest.mark.parametrize("pcap", FIXTURES_TODAS, ids=lambda p: p.stem)

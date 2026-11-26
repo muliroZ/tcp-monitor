@@ -3,10 +3,11 @@ nome: handshake_incompleto
 descricao: >
   O atacante envia SYN do próprio IP e nunca responde ao SYN-ACK (saída de RST bloqueada
   com iptables). Cada SYN é um episódio pontual; o espaçamento > tau_hs mantém no máximo um
-  handshake do atacante pendente por vez (handshake incompleto isolado).
+  handshake do atacante pendente por vez (handshake incompleto isolado). Chave de
+  associação: origem (D34).
 blocos:
   - tipo: handshake_incompleto
     classe: handshake_incompleto
-    n_syn: 20
+    n_syn: 60                 # D34: 60 episódios pontuais (IC de Wilson mais estreito)
     espacamento_s: 75
     porta_destino: 80

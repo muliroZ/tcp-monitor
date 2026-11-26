@@ -97,7 +97,7 @@ externo), captura na ponte da rede e grava pcap, rótulos e metadado:
 
 ```bash
 python lab/generate.py --cenario xmas --semente 42          # ou --scenario/--seed
-python lab/generate.py --cenario teste --semente 42         # todos os ataques em sequência (~104 min)
+python lab/generate.py --cenario teste --semente 42         # todos os ataques em sequência (~154 min)
 python lab/generate.py --cenario calibracao --semente 43    # só benigno, 15 min
 python lab/generate.py --cenario teste --semente 42 --apenas-plano   # só o plano, sem Docker
 ```
@@ -112,7 +112,7 @@ plano) e `....plano.json`.
 | ack_sem_syn | sequência | ACK sem handshake, 10 pacotes/s por 5 min | origem |
 | xmas | flags inválidas | FIN+PSH+URG, 10 pacotes/s por 5 min | origem |
 | null | flags inválidas | sem flags, 10 pacotes/s por 5 min | origem |
-| handshake_incompleto | temporal | 20 SYNs isolados (75 s entre eles), RST bloqueado | servidor |
+| handshake_incompleto | temporal | 60 SYNs isolados (75 s entre eles), RST bloqueado; cada SYN é um episódio | origem |
 | synflood_baixa / synflood_alta | volumétrica | SYNs forjados de 10.99.0.0/16, Poisson λ_A ∈ {0,02 … 100}/s | servidor |
 | varredura_horizontal | volumétrica | SYN na porta 80 de 20 hosts, 10/s por 5 min | origem |
 
