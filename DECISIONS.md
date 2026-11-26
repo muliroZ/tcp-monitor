@@ -179,9 +179,6 @@ demais dias são teste. Nada medido no teste volta para a escolha de parâmetros
 - Baixar os pcaps do CIC-IDS2017 (segunda-feira e dias de ataque) e do dia de SYN Flood do
   CIC-DDoS2019. A equipe ainda não os tem.
 - Definir a calibração do CIC-DDoS2019 (D37).
-- D52: a fila `pfifo` da D13 não impede a reordenação do `netem` neste kernel. Decidir se os
-  dados do laboratório ficam como estão (T efetivo ≈ 39 ms, reordenação reportada como
-  limitação) ou se o aparato muda e as capturas são refeitas.
 
 ---
 
@@ -268,7 +265,8 @@ latência, não reordenação; reordenação é uma limitação discutida à par
 
 **Verificação (D52):** neste kernel a fila filha **não** impede a reordenação. O ACK puro do
 handshake e o segmento de dados que o segue trocam de ordem em cerca de metade das conexões,
-com ou sem a `pfifo`. A intenção da D13 não é cumprida pelo aparato; decisão com a equipe.
+com ou sem a `pfifo`. A intenção da D13 não é cumprida pelo aparato. A equipe decidiu manter
+os dados e reportar a reordenação como limitação (D52).
 
 ### D14 — Backlog do servidor e alvos da varredura
 2026-11-25 · fase 3 · aberta
@@ -534,8 +532,8 @@ k_scan para cada janela, sobre o mesmo pcap de calibração.
   com N_s > k_s contra `poisson.sf(k_s, â_s)`) e as figuras ganham sufixo com o IP quando há
   mais de um servidor.
 
-### D52 — Resultado do diagnóstico da D35: reordenação no `netem`
-2026-11-26 · fase 8 · aberta · resultado da D35; contradiz a verificação da D13
+### D52 — Resultado do diagnóstico da D35: reordenação no `netem` **[equipe]**
+2026-11-26 · fase 8 · decidida · resultado da D35; contradiz a verificação da D13
 
 **Causa medida.** O `netem` sorteia um atraso independente N(50, 20) ms para cada pacote. O
 ACK puro do handshake e o segmento da requisição HTTP, que o cliente envia logo depois,
@@ -579,8 +577,11 @@ para contar reordenação. Na entrada, container − ponte fica entre 0 e 0,04 m
 idênticos (ACKs duplicados) são pareados pela ordem de ocorrência. Portas locais
 reutilizadas são excluídas: 19 na variante configurada, 0 sem fila filha, 1 sem jitter.
 
-**Pendente com a equipe:** manter os dados como estão (reordenação reportada como limitação)
-ou mudar o aparato para cumprir a D13 e refazer as capturas.
+**Decisão da equipe (2026-11-26):** os dados ficam como estão e a reordenação vira limitação do
+artigo. As capturas `calibracao_s43` e `teste_s42` e o `netem` (50 ± 20 ms, normal, com a fila
+`pfifo`) não mudam. O artigo reporta o T efetivo medido (Ê[T] = 38,7 ms na calibração), a causa
+(o `netem` com jitter reordena pacotes de uma mesma conexão; o handshake termina no primeiro
+segmento do cliente com ACK) e o resultado da variante sem jitter como controle.
 
 ### D53 — P_D teórica também com a taxa realizada do episódio
 2026-11-26 · fase 8 · aberta
