@@ -35,6 +35,8 @@ Fases 7 (avaliação) e 8 (validação analítica).
   referências teóricas de um atraso e do mínimo de dois atrasos, e `--reanalisar` para refazer
   a análise sem Docker. O cliente do laboratório registra a porta local de cada conexão, e a
   fila filha do `netem` passa a ser explícita em `_base.yaml`.
+- D53: `pd_vs_taxa.csv`, `analytic.json` e `pd_vs_taxa.png` trazem também a P_D teórica com a
+  taxa realizada em cada episódio (λ̂_A).
 - D52: resultado do diagnóstico. O `netem` com jitter reordena o ACK puro e o segmento de dados
   seguinte em cerca de 50% das conexões, com ou sem fila filha. Por isso T ≈ 39 ms (o mínimo
   de dois atrasos), e não 50 ms. A verificação da D13 não se sustenta. Fica pendente com a

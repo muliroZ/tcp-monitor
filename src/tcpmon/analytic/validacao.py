@@ -300,6 +300,11 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
                 "lambda_A": lam,
                 "k": k_usado,
                 "P_D_teorica": float(p_d(k_usado, a, b)) if not math.isnan(a) else None,
+                # D53: a mesma curva com b̂ = λ̂_A · τ_hs (taxa realizada no episódio).
+                "lambda_A_estimado": lam_hat,
+                "P_D_teorica_lambda_estimado": (
+                    float(p_d(k_usado, a, lam_hat * tau)) if not (math.isnan(a) or math.isnan(lam_hat)) else None
+                ),
                 "P_D_empirica": nd / est_ret.size if est_ret.size else None,
                 "P_D_ic_inf": dl,
                 "P_D_ic_sup": dh,
