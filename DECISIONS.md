@@ -283,3 +283,45 @@ benigno, e as duas formas coincidem.
 `camadas` na configuração, com o agregador em modo de coleta (retratos e contagens sem
 decisão). A pasta da calibração (`results/.../<run_id>-calib/`) guarda `flows.csv`,
 `snapshots.csv`, `varredura.csv` e `calibration.json`.
+
+### D33 — Janela positiva × zona de transição
+2026-11-25 · fase 7 · aberta
+
+Lido ao pé da letra, "janelas que intersectam `[t_fim, t_fim + τ_hs]`" incluiria a própria
+janela que contém `t_fim` — e um episódio pontual nunca teria janela positiva. Por isso a
+janela que intersecta o episódio é positiva; a zona de transição são as demais janelas que
+intersectam `[t_fim, t_fim + τ_hs]`. Uma janela positiva para qualquer episódio nunca é de
+transição; benignas são as que não são nem uma coisa nem outra. A zona de transição vale para
+todas as classes.
+
+### D34 — Latência
+2026-11-25 · fase 7 · aberta
+
+Latência do episódio = `t_alerta` do primeiro alerta que casa com ele (mesma chave e janela
+de `t_evidencia` entre as janelas positivas do episódio) − `t_inicio`. Reporta-se mediana e
+p95 por configuração e classe, mais a latência de cada episódio em `episodios.csv`. O
+documento de pesquisa também cita latência em pacotes; o guia define em tempo, e é o que se
+mede.
+
+### D35 — Precisão, F1 e falso alarme
+2026-11-25 · fase 7 · aberta
+
+FP e TN são contados nas janelas benignas, com qualquer alerta de qualquer camada; por isso
+P_FA é a mesma para todas as classes de uma configuração. Precisão por classe =
+TP_classe / (TP_classe + FP). `falsos_alarmes.csv` detalha os motivos dos alertas em janelas
+benignas e `transicao.csv` os alertas nas zonas de transição.
+
+### D36 — McNemar e diferença de P_D
+2026-11-25 · fase 7 · aberta
+
+Pares C1×C2, C2×C3 e C1×C3, por classe, sobre as janelas positivas da classe. Exato
+(binomial) com menos de 25 discordâncias; senão qui-quadrado com correção de continuidade.
+Holm sobre todos os testes da avaliação. A diferença reportada é P_D(B) − P_D(A) com IC de
+Newcombe para dados pareados (método 10, intervalos de Wilson e φ corrigido), conferido
+contra a tabela de referência 20/12/2/16 (IC 0,056156 a 0,329207).
+
+### D37 — Alertas fora das janelas completas
+2026-11-25 · fase 7 · aberta
+
+Alertas cuja janela é a final incompleta não entram nas métricas; a quantidade aparece em
+`desempenho.csv` (`alertas_fora_das_janelas_completas`).
