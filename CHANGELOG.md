@@ -8,6 +8,9 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 ### Alterado
 - D52 decidida pela equipe: os dados do laboratório ficam como estão e a reordenação do
   `netem` é reportada como limitação do artigo.
+- D53 e D55 decididas pela equipe: mantidas como estão.
+- D54 decidida pela equipe: a dependência entre janelas é reportada como limitação; os
+  intervalos de Wilson e o McNemar continuam como o guia pede.
 
 ## [0.5.0] — 2026-11-26
 

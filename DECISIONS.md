@@ -583,8 +583,8 @@ artigo. As capturas `calibracao_s43` e `teste_s42` e o `netem` (50 ± 20 ms, nor
 (o `netem` com jitter reordena pacotes de uma mesma conexão; o handshake termina no primeiro
 segmento do cliente com ACK) e o resultado da variante sem jitter como controle.
 
-### D53 — P_D teórica também com a taxa realizada do episódio
-2026-11-26 · fase 8 · aberta
+### D53 — P_D teórica também com a taxa realizada do episódio **[equipe]**
+2026-11-26 · fase 8 · decidida
 
 O guia define b = λ_A × τ_hs com o λ_A do gerador e pede para reportar λ̂_A junto. As chegadas
 de ataque são Poisson, então o número de SYNs de um episódio de 300 s varia: na captura `teste`
@@ -595,8 +595,10 @@ de 15 esperados. A comparação pedida pelo guia (P_D teórica com λ_A nominal)
 esse valor como losango vazado. λ̂_A é estimado no episódio inteiro, pelos fluxos da faixa
 forjada. Motivo: separar o erro do modelo da variação amostral do gerador.
 
-### D54 — Dependência entre janelas e intervalos de Wilson
-2026-11-26 · fase 7–8 · aberta · sem mudança no código
+**Decisão da equipe (2026-11-26):** mantida como está.
+
+### D54 — Dependência entre janelas e intervalos de Wilson **[equipe]**
+2026-11-26 · fase 7–8 · decidida · sem mudança no código
 
 O guia pede intervalos de Wilson para P_D e P_FA por janela, e o Wilson supõe janelas
 independentes. Não são: um SYN de ataque fica pendente τ_hs = 63 s e entra em cerca de 63
@@ -604,12 +606,18 @@ retratos seguidos com W = 1 s; um episódio de SYN Flood a 0,02/s tem uns 6 SYNs
 237 retratos estacionários desse episódio carregam bem menos informação do que 237 ensaios
 independentes, e o IC de Wilson subestima a incerteza, principalmente nas taxas baixas e na
 P_FA do agregador. O mesmo vale, em menor grau, para o McNemar sobre janelas pareadas.
-Mantido como o guia pede. Opções para a equipe: reportar a limitação; acrescentar ICs por
+Mantido como o guia pede. Opções levadas à equipe: reportar a limitação; acrescentar ICs por
 bootstrap em blocos (blocos ≥ τ_hs); ou repetir os episódios de taxa baixa com várias sementes
 e usar o episódio como unidade.
 
-### D55 — Efeito de W na calibração do k empírico
-2026-11-26 · fase 6–8 · aberta · sem mudança no código
+**Decisão da equipe (2026-11-26):** reportar como limitação do artigo. Os intervalos de Wilson e
+o McNemar continuam como o guia pede, sem ICs adicionais. O artigo deve dizer que as janelas
+não são independentes (cada SYN de ataque fica pendente τ_hs e aparece em retratos seguidos)
+e que, por isso, os ICs por janela subestimam a incerteza, sobretudo nas taxas baixas de SYN
+Flood e na P_FA do agregador.
+
+### D55 — Efeito de W na calibração do k empírico **[equipe]**
+2026-11-26 · fase 6–8 · decidida · sem mudança no código
 
 Os retratos são tirados no fim de cada janela, então a calibração de 15 min rende 903
 retratos com W = 1 s, 180 com W = 5 s e 90 com W = 10 s. Com α = 0,01, o k empírico sai 2 com
@@ -617,6 +625,9 @@ W = 1 s e 1 com W = 5 s e 10 s; o k analítico é 2 nos três casos. Com k = 1, 
 agregador no teste é 3/191 = 0,016 (W = 5 s) e 2/57 = 0,035 (W = 10 s), acima de α, mas de
 acordo com a teoria para k = 1 (`poisson.sf(1, â)` = 0,0169). Com 90 ou 180 retratos, o
 quantil 1 − α = 0,99 fica mal estimado: no máximo 0 ou 1 retrato acima de k. Mantido como o
-guia pede (k empírico da calibração, mesmo W). Para decidir com a equipe: tirar os retratos da
+guia pede (k empírico da calibração, mesmo W). Opções levadas à equipe: tirar os retratos da
 calibração com W = 1 s em qualquer configuração, aumentar a calibração, ou usar o k analítico
 quando houver poucos retratos.
+
+**Decisão da equipe (2026-11-26):** mantida como está. O k empírico continua vindo da calibração
+com o mesmo W da execução, e os resultados de W = 5 s e 10 s (k = 1) são reportados como estão.
