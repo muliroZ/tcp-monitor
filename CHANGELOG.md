@@ -25,6 +25,11 @@ Fases 7 (avaliação) e 8 (validação analítica).
 - D33: inclusão C1 ⊆ C2 verificada por traço rejeitado (mesma chave e instante do primeiro
   pacote, `t_alerta` da C2 ≤ C1); a comparação por alerta idêntico vira o relatório de
   divergência por janela. C2 ⊆ C3 continua por alerta idêntico.
+- D36: `agregador.servidores` (lista de IPs monitorados, obrigatória com o agregador), retratos
+  só desses servidores desde a primeira janela, k por servidor na calibração e no agregador,
+  P_FA por servidor na avaliação (`pfa_por_servidor.csv`) e na validação analítica, ROC por
+  servidor.
+- D35 (diagnóstico 1): estatísticas e figura de T separadas por `motivo_fim_pendente`.
 
 ## [0.4.0] — 2026-11-25
 

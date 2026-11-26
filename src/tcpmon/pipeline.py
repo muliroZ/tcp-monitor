@@ -199,9 +199,17 @@ def executar(
     camadas = tuple(cfg.camadas if camadas is None else camadas)
     tau, tau_origem, meta = resolver_tau(cfg, pcap)
 
+    servidores = cfg.agregador.servidores
     k, k_scan, origem_k = cfg.agregador.k, cfg.agregador.k_scan, "configuração"
     if calibracao is not None:
         k, k_scan, origem_k = calibracao["k"], calibracao["k_scan"], calibracao.get("_caminho", "calibração")
+        cal_srv = calibracao.get("servidores")
+        if 3 in camadas and cal_srv is not None and servidores and list(cal_srv) != list(servidores):
+            raise ValueError(
+                f"a calibração foi feita para os servidores {cal_srv}, mas a configuração lista {list(servidores)} (D36)"
+            )
+    if (3 in camadas or coletar_retratos) and not servidores:
+        raise ValueError("a camada 3 e a calibração exigem agregador.servidores (D36)")
     if 3 in camadas and (k is None or k_scan is None):
         raise ValueError(
             "a camada 3 precisa de k e k_scan: rode 'tcpmon calibrate' e passe --calibracao <calibration.json>"
@@ -217,6 +225,7 @@ def executar(
         "tau_hs_s": tau,
         "k": k,
         "k_scan": k_scan,
+        "servidores": list(servidores) if servidores else None,
         "pcap_sha256": pcap_sha,
         "coletar_retratos": coletar_retratos,
     }
@@ -262,6 +271,7 @@ def executar(
         "k": k,
         "k_scan": k_scan,
         "k_origem": origem_k if 3 in camadas else None,
+        "servidores": list(servidores) if servidores else None,
         "pcap": {"caminho": str(pcap), "sha256": pcap_sha},
         "metadado_laboratorio": {
             "sysctls_servidor": meta.get("sysctls_servidor"),

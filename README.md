@@ -141,14 +141,16 @@ timestamps do pcap; fluxos ainda pendentes no fim da captura ficam `truncado`, s
 ### Camada 3 — agregador e calibração
 
 Ao fim de cada janela `[t0 + i·W, t0 + (i+1)·W)` o agregador tira um retrato de N_s (handshakes
-pendentes por IP de servidor); se N_s > k, alerta `AGG_HANDSHAKE_PENDENTE`. Também conta, por
+pendentes) de cada servidor listado em `agregador.servidores` — lista definida antes de qualquer
+execução sobre o teste (D36) — e, se N_s > k_s, alerta `AGG_HANDSHAKE_PENDENTE`. O limiar k é por
+servidor. Também conta, por
 (IP de origem, porta de destino), os IPs de destino distintos dos fluxos iniciados na janela;
 acima de k_scan, alerta `AGG_VARREDURA_HORIZONTAL`.
 
 `tcpmon calibrate` roda as camadas 1 e 2 sobre o pcap de calibração (só benigno) e grava em
-`calibration.json`: k empírico (menor k com fração de retratos N_s > k ≤ α), k_scan pelo mesmo
-critério, k analítico (menor k com `poisson.sf(k, â) ≤ α`, â = λ̂_L·Ê[T]) e as estimativas por
-servidor. Os experimentos usam o k empírico; o analítico é reportado para comparação.
+`calibration.json`: k_s empírico por servidor (menor k com fração dos retratos do servidor com
+N_s > k ≤ α), k_scan pelo mesmo critério sobre as contagens de varredura, k analítico por servidor
+(menor k com `poisson.sf(k, â_s) ≤ α`, â_s = λ̂_L,s·Ê[T]_s) e as estimativas por servidor. Os experimentos usam o k empírico; o analítico é reportado para comparação.
 
 ### Alfabeto
 

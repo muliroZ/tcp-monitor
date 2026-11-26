@@ -42,9 +42,15 @@ def _taxa_txt(lam: float) -> str:
     return f"{lam:g}".replace(".", "_")
 
 
-def roc(pasta: Path, curvas: pd.DataFrame, k_usado: int) -> None:
-    for (ep, lam), g in curvas.groupby(["episodio", "lambda_A"], sort=False):
+def _sufixo(srv: str, varios: bool) -> str:
+    return f"_{srv.replace(':', '-').replace('.', '-')}" if varios else ""
+
+
+def roc(pasta: Path, curvas: pd.DataFrame) -> None:
+    varios = curvas["servidor"].nunique() > 1
+    for (srv, ep, lam), g in curvas.groupby(["servidor", "episodio", "lambda_A"], sort=False):
         g = g.sort_values("k")
+        k_usado = int(g["k_servidor"].iloc[0])
         fig, ax = plt.subplots(figsize=(5.2, 4.4))
         if g["P_FA_teorica"].notna().any():
             ax.plot(g["P_FA_teorica"], g["P_D_teorica"], color=AZUL, linewidth=2, label="teórica (Poisson)")
@@ -75,16 +81,21 @@ def roc(pasta: Path, curvas: pd.DataFrame, k_usado: int) -> None:
         n_est = int(g["n_estacionarios"].iloc[0])
         n_ben = int(g["n_benignos"].iloc[0])
         _estilo(ax, f"ROC — SYN Flood λ_A = {lam:g}/s", "P_FA", "P_D")
-        ax.text(0.98, 0.30, f"episódio {ep}\n{n_est} retratos estacionários\n{n_ben} retratos benignos",
+        ax.text(0.98, 0.30, f"servidor {srv}, episódio {ep}\n{n_est} retratos estacionários\n{n_ben} retratos benignos",
                 transform=ax.transAxes, ha="right", va="bottom", color=TEXTO_2, fontsize=8)
         ax.legend(frameon=False, loc="lower right")
-        _salvar(fig, pasta / f"roc_{_taxa_txt(lam)}.png")
+        _salvar(fig, pasta / f"roc_{_taxa_txt(lam)}{_sufixo(srv, varios)}.png")
 
 
-def pd_vs_taxa(pasta: Path, pdt: pd.DataFrame, k_usado: int) -> None:
-    if pdt.empty:
+def pd_vs_taxa(pasta: Path, pdt_todos: pd.DataFrame) -> None:
+    if pdt_todos.empty:
         return
-    pdt = pdt.sort_values("lambda_A")
+    varios = pdt_todos["servidor"].nunique() > 1
+    for srv, pdt in pdt_todos.groupby("servidor"):
+        _pd_vs_taxa(pasta, pdt.sort_values("lambda_A"), srv, int(pdt["k"].iloc[0]), varios)
+
+
+def _pd_vs_taxa(pasta: Path, pdt: pd.DataFrame, srv: str, k_usado: int, varios: bool) -> None:
     fig, ax = plt.subplots(figsize=(5.6, 4.2))
     ax.plot(pdt["lambda_A"], pdt["P_D_teorica"], color=AZUL, linewidth=2, marker="o", markersize=4, label="teórica")
     emp = pdt[pdt["P_D_empirica"].notna()]
@@ -93,16 +104,19 @@ def pd_vs_taxa(pasta: Path, pdt: pd.DataFrame, k_usado: int) -> None:
                 markeredgecolor="white", capsize=2, elinewidth=1, label="empírica (IC 95%)")
     ax.set_xscale("log")
     ax.set_ylim(-0.02, 1.02)
-    _estilo(ax, f"P_D em função de λ_A (k = {k_usado})", "λ_A (SYN/s, escala log) — retratos estacionários", "P_D")
+    _estilo(ax, f"P_D em função de λ_A (k = {k_usado})", f"λ_A (SYN/s, escala log) — servidor {srv}, retratos estacionários", "P_D")
     ax.legend(frameon=False, loc="lower right")
-    _salvar(fig, pasta / "pd_vs_taxa.png")
+    _salvar(fig, pasta / f"pd_vs_taxa{_sufixo(srv, varios)}.png")
 
 
 def retratos_benignos(pasta: Path, por_servidor: dict) -> None:
-    alvo = max(por_servidor.items(), key=lambda kv: kv[1]["_retratos"].size, default=None)
-    if alvo is None or alvo[1]["_retratos"].size == 0:
-        return
-    srv, d = alvo
+    varios = len(por_servidor) > 1
+    for srv, d in por_servidor.items():
+        if d["_retratos"].size:
+            _retratos_benignos(pasta, srv, d, varios)
+
+
+def _retratos_benignos(pasta: Path, srv: str, d: dict, varios: bool) -> None:
     r = d["_retratos"]
     a = d["a"]
     kmax = int(max(r.max(), stats.poisson.ppf(0.999, a) if a and not math.isnan(a) else 0)) + 1
@@ -116,14 +130,35 @@ def retratos_benignos(pasta: Path, por_servidor: dict) -> None:
     ax.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
     _estilo(ax, "Retratos benignos de N_s (calibração)", f"N_s (handshakes pendentes) — servidor {srv}", "fração dos retratos")
     ax.legend(frameon=False)
-    _salvar(fig, pasta / "retratos_benignos.png")
+    _salvar(fig, pasta / f"retratos_benignos{_sufixo(srv, varios)}.png")
 
 
 def tempo_handshake(pasta: Path, por_servidor: dict, tau: float) -> None:
-    alvo = max(por_servidor.items(), key=lambda kv: kv[1]["_T"].size, default=None)
-    if alvo is None or alvo[1]["_T"].size < 3:
-        return
-    srv, d = alvo
+    varios = len(por_servidor) > 1
+    for srv, d in por_servidor.items():
+        if d["_T"].size >= 3:
+            _tempo_handshake(pasta, srv, d, tau, varios)
+            _tempo_por_motivo(pasta, srv, d, varios)
+
+
+def _tempo_por_motivo(pasta: Path, srv: str, d: dict, varios: bool) -> None:
+    """D35 (diagnóstico 1): histograma de T separado por motivo_fim_pendente."""
+    t, mot = d["_T"], d["_T_motivos"]
+    motivos = [m for m in sorted(set(mot), key=lambda m: -np.sum(mot == m))]
+    cores = [LARANJA, AZUL, VERDE_AGUA, AMARELO, MAGENTA]
+    fig, ax = plt.subplots(figsize=(8.0, 4.2))
+    lim = float(np.percentile(t, 99.5)) * 1.1 if t.size else 1.0
+    bins = np.linspace(0, lim, int(min(60, max(10, np.sqrt(t.size)))) + 1)
+    for cor, m in zip(cores, motivos):
+        v = t[mot == m]
+        ax.hist(v, bins=bins, histtype="step", linewidth=2, color=cor,
+                label=f"{m or 'sem motivo'} (n = {v.size}, média = {v.mean() * 1000:.1f} ms)")
+    _estilo(ax, "Tempo de handshake benigno T por forma de saída do pendente", f"T (s) — servidor {srv}", "fluxos")
+    ax.legend(frameon=False, fontsize=8, loc="upper left", bbox_to_anchor=(1.01, 1.0))
+    _salvar(fig, pasta / f"tempo_handshake_por_motivo{_sufixo(srv, varios)}.png")
+
+
+def _tempo_handshake(pasta: Path, srv: str, d: dict, tau: float, varios: bool) -> None:
     t = d["_T"][d["_T"] > 0]
     fig, ax = plt.subplots(figsize=(8.0, 4.2))
     bins = int(min(60, max(10, np.sqrt(t.size))))
@@ -137,14 +172,14 @@ def tempo_handshake(pasta: Path, por_servidor: dict, tau: float) -> None:
                     label=f"{nome} (P(T>τ) = {info['P_T_maior_tau']:.2g})")
     _estilo(ax, "Tempo de handshake benigno T", f"T (s) — servidor {srv}; P(T > τ) avaliada em τ_hs = {tau:g} s", "densidade")
     ax.legend(frameon=False, fontsize=8, loc="upper left", bbox_to_anchor=(1.01, 1.0))
-    _salvar(fig, pasta / "tempo_handshake.png")
+    _salvar(fig, pasta / f"tempo_handshake{_sufixo(srv, varios)}.png")
 
 
-def gerar_figuras(pasta: Path, por_servidor: dict, curvas: pd.DataFrame, pdt: pd.DataFrame, tau: float, k_usado: int) -> None:
+def gerar_figuras(pasta: Path, por_servidor: dict, curvas: pd.DataFrame, pdt: pd.DataFrame, tau: float, k_srv: dict) -> None:
     pasta.mkdir(parents=True, exist_ok=True)
     plt.rcParams.update({"font.size": 9, "axes.titlesize": 10})
     if not curvas.empty:
-        roc(pasta, curvas, k_usado)
-    pd_vs_taxa(pasta, pdt, k_usado)
+        roc(pasta, curvas)
+    pd_vs_taxa(pasta, pdt)
     retratos_benignos(pasta, por_servidor)
     tempo_handshake(pasta, por_servidor, tau)

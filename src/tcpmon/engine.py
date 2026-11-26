@@ -42,9 +42,10 @@ class ParametrosEngine:
     msl_s: float
     ocioso_estabelecido_s: float
     camadas: tuple[int, ...]
-    k: int | None = None
+    k: int | dict[str, int] | None = None  # D36: um k por servidor (ou um valor para todos)
     k_scan: int | None = None
     coletar_retratos: bool = False  # retratos e contagens de varredura sem decidir (calibração)
+    servidores: tuple[str, ...] | None = None  # D36: servidores monitorados pelo agregador
 
     @classmethod
     def de_config(
@@ -53,9 +54,10 @@ class ParametrosEngine:
         *,
         tau_hs_s: float | None = None,
         camadas: tuple[int, ...] | None = None,
-        k: int | None = None,
+        k: int | dict[str, int] | None = None,
         k_scan: int | None = None,
         coletar_retratos: bool = False,
+        servidores: tuple[str, ...] | None = None,
     ) -> "ParametrosEngine":
         return cls(
             janela_s=cfg.janela_s,
@@ -67,6 +69,7 @@ class ParametrosEngine:
             k=cfg.agregador.k if k is None else k,
             k_scan=cfg.agregador.k_scan if k_scan is None else k_scan,
             coletar_retratos=coletar_retratos,
+            servidores=cfg.agregador.servidores if servidores is None else tuple(servidores),
         )
 
 
@@ -120,7 +123,9 @@ class Engine:
         if 3 in p.camadas or p.coletar_retratos:
             from tcpmon.monitors.aggregator import Aggregator
 
-            self.agregador = Aggregator(self, k=p.k, k_scan=p.k_scan, decidir=3 in p.camadas)
+            self.agregador = Aggregator(
+                self, servidores=p.servidores, k=p.k, k_scan=p.k_scan, decidir=3 in p.camadas
+            )
             self.monitores.append(self.agregador)
 
     # ------------------------------------------------------------------ tempo e eventos

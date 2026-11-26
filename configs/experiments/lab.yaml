@@ -5,6 +5,8 @@ entrada:
   pcap: data/lab/teste_s42.pcap
   rotulos: data/lab/teste_s42_labels.csv
   metadado: null              # usa data/lab/teste_s42.meta.json (tau_hs da sysctl do servidor)
+agregador:
+  servidores: [10.77.0.10]    # D36: o servidor HTTP do laboratório
 saida: results/lab/
 experimento:                  # lido por experiments/run.py
   calibracao_pcap: data/lab/calibracao_s43.pcap

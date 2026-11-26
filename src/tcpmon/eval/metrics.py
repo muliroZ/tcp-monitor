@@ -140,6 +140,46 @@ def _alertas_por_motivo(ex: Execucao, mascara: np.ndarray, rotulo: str) -> list[
     ]
 
 
+def _pfa_por_servidor(ex: Execucao, rot, servidores: list[str]) -> list[dict]:
+    """D36: P_FA de cada servidor monitorado nas janelas benignas.
+
+    Uma janela benigna é falso alarme do servidor s se tem alerta cujo campo ``servidor`` é s
+    (qualquer camada); a coluna ``_agregador`` conta só ``AGG_HANDSHAKE_PENDENTE``.
+    """
+    from tcpmon.flows.key import endpoint_ip
+
+    n_ben = int(rot.benigna.sum())
+    out = []
+    for srv in servidores:
+        qualquer, agg = set(), set()
+        for i, lista in ex.por_janela.items():
+            if not (0 <= i < rot.n and rot.benigna[i]):
+                continue
+            for a in lista:
+                if a.servidor and endpoint_ip(a.servidor) == srv:
+                    qualquer.add(i)
+                    if a.motivo == "AGG_HANDSHAKE_PENDENTE":
+                        agg.add(i)
+        lo, hi = wilson(len(qualquer), n_ben)
+        lo_a, hi_a = wilson(len(agg), n_ben)
+        out.append(
+            {
+                "config": ex.config,
+                "servidor": srv,
+                "janelas_benignas": n_ben,
+                "FP": len(qualquer),
+                "P_FA": _div(len(qualquer), n_ben),
+                "P_FA_ic_inf": lo,
+                "P_FA_ic_sup": hi,
+                "FP_agregador": len(agg),
+                "P_FA_agregador": _div(len(agg), n_ben),
+                "P_FA_agregador_ic_inf": lo_a,
+                "P_FA_agregador_ic_sup": hi_a,
+            }
+        )
+    return out
+
+
 def avaliar(runs: list[str | Path], rotulos: str | Path, saida: str | Path | None = None) -> Path:
     execs = [Execucao(Path(p)) for p in runs]
     configs = [e.config for e in execs]
@@ -164,8 +204,10 @@ def avaliar(runs: list[str | Path], rotulos: str | Path, saida: str | Path | Non
     saida = Path(saida)
     saida.mkdir(parents=True, exist_ok=True)
 
-    metricas, eps, det, fa, trans, desemp = [], [], {}, [], [], []
+    metricas, eps, det, fa, trans, desemp, pfa_srv = [], [], {}, [], [], [], []
+    servidores = next((e.run.get("servidores") for e in execs if e.run.get("servidores")), []) or []
     for ex in execs:
+        pfa_srv += _pfa_por_servidor(ex, rot, servidores)
         m, e_l, d = _metricas_config(ex, rot, classes)
         metricas += m
         eps += e_l
@@ -266,6 +308,7 @@ def avaliar(runs: list[str | Path], rotulos: str | Path, saida: str | Path | Non
         saida / "transicao.csv", index=False
     )
     pd.DataFrame(desemp).to_csv(saida / "desempenho.csv", index=False)
+    pd.DataFrame(pfa_srv).to_csv(saida / "pfa_por_servidor.csv", index=False)
     (saida / "inclusao.json").write_text(json.dumps(inclusao, indent=2, ensure_ascii=False, default=str))
     meta = {
         "execucoes": {e.config: str(e.pasta) for e in execs},
@@ -281,7 +324,9 @@ def avaliar(runs: list[str | Path], rotulos: str | Path, saida: str | Path | Non
         "janelas_positivas_por_classe": {c: int(rot.positivas[c].sum()) for c in classes},
     }
     (saida / "avaliacao.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False))
-    (saida / "resumo.md").write_text(_resumo(meta, metricas, testes, desemp, inclusao), encoding="utf-8")
+    meta["servidores_monitorados"] = servidores
+    (saida / "avaliacao.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False))
+    (saida / "resumo.md").write_text(_resumo(meta, metricas, testes, desemp, inclusao, pfa_srv), encoding="utf-8")
     return saida
 
 
@@ -291,7 +336,7 @@ def _fmt(x, nd=3) -> str:
     return f"{x:.{nd}f}"
 
 
-def _resumo(meta, metricas, testes, desemp, inclusao) -> str:
+def _resumo(meta, metricas, testes, desemp, inclusao, pfa_srv=()) -> str:
     linhas = [
         "# Resultados da avaliação",
         "",
@@ -319,6 +364,13 @@ def _resumo(meta, metricas, testes, desemp, inclusao) -> str:
         if m:
             linhas.append(
                 f"| {cfg} | {_fmt(m['P_FA'], 4)} [{_fmt(m['P_FA_ic_inf'], 4)}, {_fmt(m['P_FA_ic_sup'], 4)}] | {m['FP']}/{m['FP'] + m['TN']} |"
+            )
+    if pfa_srv:
+        linhas += ["", "### P_FA por servidor monitorado (D36)", "", "| Config | Servidor | P_FA (qualquer alerta) [IC] | P_FA do agregador [IC] |", "| --- | --- | --- | --- |"]
+        for r in pfa_srv:
+            linhas.append(
+                f"| {r['config']} | {r['servidor']} | {_fmt(r['P_FA'], 4)} [{_fmt(r['P_FA_ic_inf'], 4)}, {_fmt(r['P_FA_ic_sup'], 4)}] | "
+                f"{_fmt(r['P_FA_agregador'], 4)} [{_fmt(r['P_FA_agregador_ic_inf'], 4)}, {_fmt(r['P_FA_agregador_ic_sup'], 4)}] |"
             )
     linhas += ["", "## Precisão, F1 e latência", "", "| Config | Classe | Precisão | F1 | Latência mediana (s) | Latência p95 (s) | Episódios detectados |", "| --- | --- | --- | --- | --- | --- | --- |"]
     for m in metricas:

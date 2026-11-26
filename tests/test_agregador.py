@@ -24,7 +24,7 @@ def cli(i):
 
 def test_retratos_contam_pendentes_no_fim_de_cada_janela():
     pacotes = [
-        pkt(0.0, ("10.9.9.9", 1), ("10.9.9.8", 1), SYN),  # t0 e um servidor sem relevância
+        pkt(0.0, ("10.9.9.9", 1), ("10.9.9.8", 1), SYN),  # t0; servidor fora da lista
         pkt(0.2, cli(1), SRV, SYN),
         pkt(0.4, cli(2), SRV, SYN),
         pkt(1.5, SRV, cli(1), SA),
@@ -33,38 +33,52 @@ def test_retratos_contam_pendentes_no_fim_de_cada_janela():
         pkt(2.5, SRV, cli(2), R),  # cli(2) sai do pendente na janela 2
         pkt(3.9, cli(4), SRV, SYN),
     ]
-    e = rodar(pacotes, camadas=(1, 2), coletar_retratos=True, t_ultimo=4.0)
+    e = rodar(pacotes, camadas=(1, 2), coletar_retratos=True, t_ultimo=4.0, servidores=("10.0.0.2", "10.0.0.3"))
     r = {(j, s): n for j, _, s, n in e.saida.retratos}
     assert r[(0, "10.0.0.2")] == 2
     assert r[(1, "10.0.0.2")] == 1
     assert r[(2, "10.0.0.2")] == 0 and r[(2, "10.0.0.3")] == 1
     assert r[(3, "10.0.0.2")] == 1 and r[(3, "10.0.0.3")] == 1
-    # SRV2 só entra nos retratos depois do primeiro SYN.
-    assert (1, "10.0.0.3") not in r
-    # Retrato no instante final da janela: t_fim = t0 + (i+1)·W.
+    # D36: todo servidor da lista tem retrato em toda janela, inclusive antes do primeiro SYN.
+    assert r[(0, "10.0.0.3")] == 0 and r[(1, "10.0.0.3")] == 0
+    # Servidores fora da lista não têm retrato.
+    assert not [x for x in e.saida.retratos if x[2] == "10.9.9.8"]
     assert {t for j, t, s, n in e.saida.retratos if j == 2} == {3.0}
-    assert e.alertas == [] or all(a.camada != 3 for a in e.alertas)  # modo coleta não decide
+    assert all(a.camada != 3 for a in e.alertas)  # modo coleta não decide
 
 
 def test_expiracao_tira_o_fluxo_da_contagem():
     pacotes = [pkt(0.0, cli(1), SRV, SYN), pkt(100.0, ("10.9.9.9", 1), ("10.9.9.8", 1), SYN)]
-    e = rodar(pacotes, camadas=(1, 2), coletar_retratos=True, tau_hs_s=10.0)
+    e = rodar(pacotes, camadas=(1, 2), coletar_retratos=True, tau_hs_s=10.0, servidores=("10.0.0.2",))
     n = {j: n for j, _, s, n in e.saida.retratos if s == "10.0.0.2"}
     assert n[8] == 1 and n[9] == 1  # janela 9 termina em 10.0: retrato antes do prazo (D23)
     assert n[10] == 0
 
 
-def test_decisao_n_maior_que_k():
-    pacotes = [pkt(0.1 * i, cli(i), SRV, SYN) for i in range(1, 6)] + [pkt(1.5, ("10.9.9.9", 1), SRV2, SYN)]
-    e = rodar(pacotes, camadas=(1, 2, 3), k=4, k_scan=100, t0=0.0)
+def test_decisao_n_maior_que_k_por_servidor():
+    pacotes = [pkt(0.1 * i, cli(i), SRV, SYN) for i in range(1, 6)]
+    pacotes += [pkt(0.1 * i + 0.05, cli(10 + i), SRV2, SYN) for i in range(1, 4)]
+    pacotes += [pkt(1.5, ("10.9.9.9", 1), ("10.9.9.8", 1), SYN)]
+    srvs = ("10.0.0.2", "10.0.0.3")
+    e = rodar(pacotes, camadas=(1, 2, 3), k={"10.0.0.2": 4, "10.0.0.3": 3}, k_scan=100, t0=0.0, servidores=srvs)
     agg = [a for a in e.alertas if a.motivo == "AGG_HANDSHAKE_PENDENTE"]
-    assert len(agg) == 1  # janela 0: N=5 > 4; janela 1 incompleta (sem retrato)
+    assert len(agg) == 1  # janela 0: SRV com N=5 > 4; SRV2 com N=3 não passa de 3
     a = agg[0]
     assert a.camada == 3 and a.janela == 0 and a.servidor == "10.0.0.2" and a.fluxo == "" and a.cliente == ""
     assert a.t_evidencia == 0.0 and a.t_alerta == 1.0
     assert a.detalhe == {"N_s": 5, "k": 4}
-    e2 = rodar(pacotes, camadas=(1, 2, 3), k=5, k_scan=100, t0=0.0)
-    assert not [a for a in e2.alertas if a.motivo == "AGG_HANDSHAKE_PENDENTE"]
+    e2 = rodar(pacotes, camadas=(1, 2, 3), k={"10.0.0.2": 5, "10.0.0.3": 2}, k_scan=100, t0=0.0, servidores=srvs)
+    agg2 = [a for a in e2.alertas if a.motivo == "AGG_HANDSHAKE_PENDENTE"]
+    assert [(a.servidor, a.detalhe["k"]) for a in agg2] == [("10.0.0.3", 2)]
+    # k único vale para todos os servidores da lista.
+    e3 = rodar(pacotes, camadas=(1, 2, 3), k=2, k_scan=100, t0=0.0, servidores=srvs)
+    assert len([a for a in e3.alertas if a.motivo == "AGG_HANDSHAKE_PENDENTE"]) == 2
+
+
+def test_servidor_fora_da_lista_nao_gera_alerta():
+    pacotes = [pkt(0.1 * i, cli(i), SRV2, SYN) for i in range(1, 9)] + [pkt(1.5, cli(50), SRV, SYN)]
+    e = rodar(pacotes, camadas=(1, 2, 3), k=0, k_scan=100, t0=0.0, servidores=("10.0.0.2",))
+    assert not [a for a in e.alertas if a.motivo == "AGG_HANDSHAKE_PENDENTE"]
 
 
 def test_varredura_horizontal():
@@ -72,7 +86,7 @@ def test_varredura_horizontal():
     pacotes = [pkt(0.1 * i, (origem[0], 40000 + i), (f"10.0.1.{i}", 80), SYN) for i in range(1, 7)]
     pacotes += [pkt(0.75, (origem[0], 50000), ("10.0.1.1", 22), SYN)]  # outra porta: outra contagem
     pacotes += [pkt(1.2, (origem[0], 40100), ("10.0.1.9", 80), SYN), pkt(2.0, ("10.9.9.9", 1), SRV, SYN)]
-    e = rodar(pacotes, camadas=(1, 2, 3), k=1000, k_scan=5, t0=0.0)
+    e = rodar(pacotes, camadas=(1, 2, 3), k=1000, k_scan=5, t0=0.0, servidores=("10.0.0.2",))
     v = {(j, o, p): c for j, o, p, c in e.saida.varreduras}
     assert v[(0, "10.5.5.5", 80)] == 6 and v[(0, "10.5.5.5", 22)] == 1 and v[(1, "10.5.5.5", 80)] == 1
     agg = [a for a in e.alertas if a.motivo == "AGG_VARREDURA_HORIZONTAL"]
@@ -81,9 +95,11 @@ def test_varredura_horizontal():
     assert agg[0].detalhe == {"porta_destino": 80, "destinos_distintos": 6, "k_scan": 5}
 
 
-def test_agregador_exige_k_para_decidir():
-    with pytest.raises(ValueError):
-        rodar([pkt(0.0, cli(1), SRV, SYN)], camadas=(1, 2, 3))
+def test_agregador_exige_servidores_e_k():
+    with pytest.raises(ValueError, match="servidores"):
+        rodar([pkt(0.0, cli(1), SRV, SYN)], camadas=(1, 2, 3), k=1, k_scan=1)
+    with pytest.raises(ValueError, match="k por servidor"):
+        rodar([pkt(0.0, cli(1), SRV, SYN)], camadas=(1, 2, 3), k={"10.0.0.3": 1}, k_scan=1, servidores=("10.0.0.2",))
 
 
 @pytest.mark.parametrize(
@@ -136,7 +152,10 @@ def test_inclusao_c2_em_c3(pcap):
     from tcpmon.io.pcap_reader import ReadCounters, read_packets
 
     for k, k_scan in ((0, 1), (3, 3)):
-        e = Engine(ParametrosEngine.de_config(cfg, tau_hs_s=63.0, camadas=(1, 2, 3), k=k, k_scan=k_scan), SaidaMemoria())
+        p = ParametrosEngine.de_config(
+            cfg, tau_hs_s=63.0, camadas=(1, 2, 3), k=k, k_scan=k_scan, servidores=("10.77.0.10",)
+        )
+        e = Engine(p, SaidaMemoria())
         cont = ReadCounters()
         for p in read_packets(pcap, cont):
             if e.t0 is None:
@@ -156,13 +175,16 @@ def test_calibrate_grava_k(tmp_path):
     assert main(["calibrate", "--config", str(cfg), "--pcap", str(pcap)]) == 0
     (arq,) = (tmp_path / "res").glob("*-calib/calibration.json")
     cal = json.loads(arq.read_text())
-    assert isinstance(cal["k"], int) and isinstance(cal["k_scan"], int)
-    assert cal["retratos"]["fracao_acima_de_k"] <= cal["alfa"]
+    assert cal["servidores"] == ["10.77.0.10"]
+    assert isinstance(cal["k"]["10.77.0.10"], int) and isinstance(cal["k_scan"], int)
+    srv = cal["por_servidor"]["10.77.0.10"]
+    assert srv["fracao_acima_de_k"] <= cal["alfa"] and srv["k"] == cal["k"]["10.77.0.10"]
+    assert srv["n_retratos"] == cal["retratos"]["n"]
     assert cal["tau_hs_s"] == 63.0
-    assert "10.77.0.10" in cal["por_servidor"]
     # O run com --calibracao usa esses k.
     assert main(["run", "--config", str(cfg), "--pcap", str(pcap), "--calibracao", str(arq)]) == 0
     runs = [p for p in (tmp_path / "res").iterdir() if not p.name.endswith("-calib")]
     run = json.loads((runs[0] / "run.json").read_text())
     assert run["k"] == cal["k"] and run["k_scan"] == cal["k_scan"] and run["configuracao"] == "C3"
+    assert run["servidores"] == ["10.77.0.10"]
     assert (runs[0] / "snapshots.csv").is_file()
