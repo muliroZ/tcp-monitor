@@ -29,8 +29,13 @@ as curvas teóricas do modelo M/G/∞.
 | 6 | Camada 3 — Agregador e calibração | ✅ |
 | 7 | Avaliação | ✅ |
 | 8 | Validação analítica | ✅ |
-| 9 | CIC-IDS2017 | bloqueada por pendências |
-| 10 | Baselines (opcional) | — |
+| 9 | CIC-IDS2017 e CIC-DDoS2019 (D37) | bloqueada: aguardando a equipe (servidores e pcaps) |
+| 10 | Baselines Zeek e Suricata (D41) | depois da fase 9 |
+
+Decisões abertas com a equipe sobre os resultados do laboratório: D52 (o `netem` com jitter
+reordena pacotes, e T efetivo ≈ 39 ms), D53 (P_D teórica com a taxa realizada), D54
+(dependência entre janelas nos intervalos de Wilson) e D55 (efeito de W no k empírico). Ver
+[DECISIONS.md](DECISIONS.md).
 
 ## Instalação
 

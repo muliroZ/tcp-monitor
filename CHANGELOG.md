@@ -3,7 +3,7 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/);
 versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 
-## [0.5.0] — 2026-11-25
+## [0.5.0] — 2026-11-26
 
 Fases 7 (avaliação) e 8 (validação analítica).
 
@@ -18,6 +18,11 @@ Fases 7 (avaliação) e 8 (validação analítica).
 - `experiments/run.py --todos`: reprodução completa com um comando.
 - Testes estatísticos conferidos contra valores publicados (Wilson, McNemar, Holm, Newcombe).
 - Decisões D42–D50 (implementação das fases 7 e 8).
+
+### Corrigido
+- Diagnóstico do `netem`: a contagem de reordenação comparava duas capturas pós-qdisc; pacotes
+  idênticos passam a ser pareados pela ordem de ocorrência; sinal da diferença na entrada.
+- `rejeitadas_de_csv` lê `flows.csv` como texto (avisos de tipos mistos do pandas).
 
 ### Alterado
 - D34: `handshake_incompleto` com chave de associação por origem e 60 SYNs (era servidor e 20);
