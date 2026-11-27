@@ -39,6 +39,7 @@ _OBRIGATORIAS = (
     "agregador",
     "entrada",
     "saida",
+    "avaliacao",
 )
 
 
@@ -59,6 +60,15 @@ class EntradaCfg:
 
 
 @dataclass(frozen=True)
+class AvaliacaoCfg:
+    # D38: tolerância dos rótulos. Janelas em [t_inicio − tol, t_inicio) e (t_fim, t_fim + tol]
+    # não são positivas nem benignas. 0 = rótulos exatos (laboratório).
+    tolerancia_rotulo_s: float
+    # Valores extras de tolerância avaliados como análise de sensibilidade (experiments/run.py).
+    sensibilidade_tolerancia_s: tuple[float, ...]
+
+
+@dataclass(frozen=True)
 class Config:
     semente: int
     janela_s: float
@@ -72,8 +82,12 @@ class Config:
     agregador: AgregadorCfg
     entrada: EntradaCfg
     saida: str
+    avaliacao: AvaliacaoCfg
     raw: dict[str, Any]
     origem: str | None = None
+    # D39: origem declarada de tau_hs_s quando ele não vem do metadado do laboratório
+    # (p. ex. "documentacao_dataset"); gravada em run.json.
+    tau_hs_origem: str | None = None
 
     def hash_curto(self) -> str:
         """Hash curto e estável da configuração (usado no run_id)."""
@@ -126,16 +140,19 @@ def carregar_yaml(path: str | Path) -> dict[str, Any]:
     return _load_raw(Path(path))
 
 
-def _num(raw: dict[str, Any], chave: str, minimo: float | None = 0.0, estrito: bool = False) -> float:
+def _num(
+    raw: dict[str, Any], chave: str, minimo: float | None = 0.0, estrito: bool = False, nome: str | None = None
+) -> float:
     valor = raw[chave]
+    nome = nome or chave
     if isinstance(valor, bool) or not isinstance(valor, (int, float)):
-        raise ConfigError(f"'{chave}' precisa ser numérico, recebido {valor!r}")
+        raise ConfigError(f"'{nome}' precisa ser numérico, recebido {valor!r}")
     valor = float(valor)
     if minimo is not None:
         if estrito and valor <= minimo:
-            raise ConfigError(f"'{chave}' precisa ser > {minimo}, recebido {valor}")
+            raise ConfigError(f"'{nome}' precisa ser > {minimo}, recebido {valor}")
         if not estrito and valor < minimo:
-            raise ConfigError(f"'{chave}' precisa ser >= {minimo}, recebido {valor}")
+            raise ConfigError(f"'{nome}' precisa ser >= {minimo}, recebido {valor}")
     return valor
 
 
@@ -211,6 +228,22 @@ def from_dict(raw: dict[str, Any], origem: str | None = None) -> Config:
         metadado=ent.get("metadado"),
     )
 
+    av = raw["avaliacao"] or {}
+    if "tolerancia_rotulo_s" not in av:
+        raise ConfigError("chave obrigatória ausente: avaliacao.tolerancia_rotulo_s")
+    sens = av.get("sensibilidade_tolerancia_s") or []
+    if not isinstance(sens, list):
+        raise ConfigError(f"'avaliacao.sensibilidade_tolerancia_s' precisa ser lista, recebido {sens!r}")
+    avaliacao = AvaliacaoCfg(
+        tolerancia_rotulo_s=_num(av, "tolerancia_rotulo_s", 0.0, nome="avaliacao.tolerancia_rotulo_s"),
+        sensibilidade_tolerancia_s=tuple(
+            _num({"v": v}, "v", 0.0, nome="avaliacao.sensibilidade_tolerancia_s") for v in sens
+        ),
+    )
+    tau_origem = raw.get("tau_hs_origem")
+    if tau_origem is not None and not isinstance(tau_origem, str):
+        raise ConfigError(f"'tau_hs_origem' precisa ser texto, recebido {tau_origem!r}")
+
     raw_norm = copy.deepcopy(raw)
     raw_norm["camadas"] = list(camadas)
 
@@ -227,8 +260,10 @@ def from_dict(raw: dict[str, Any], origem: str | None = None) -> Config:
         agregador=agregador,
         entrada=entrada,
         saida=str(raw["saida"]),
+        avaliacao=avaliacao,
         raw=raw_norm,
         origem=origem,
+        tau_hs_origem=tau_origem,
     )
 
 

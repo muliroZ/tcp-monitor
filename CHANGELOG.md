@@ -5,7 +5,17 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+### Adicionado
+- D38 (D56): tolerância de rótulo na avaliação e na validação analítica
+  (`avaliacao.tolerancia_rotulo_s`), `tcpmon eval --tolerancia` e análise de sensibilidade em
+  `experiments/run.py` (`avaliacao.sensibilidade_tolerancia_s`).
+- D38 (D58): `tcpmon agenda` converte a agenda oficial transcrita (horário local) em
+  `labels.csv` (UTC), sem ajustar nada e reportando problemas.
+- D39 (D57): `tau_hs_origem` na configuração, gravada em `run.json` quando τ_hs não vem do
+  metadado do laboratório.
+
 ### Alterado
+- O bloco `avaliacao` passa a ser obrigatório na configuração (já está em `default.yaml`).
 - D52 decidida pela equipe: os dados do laboratório ficam como estão e a reordenação do
   `netem` é reportada como limitação do artigo.
 - D53 e D55 decididas pela equipe: mantidas como estão.

@@ -23,3 +23,9 @@ entrada:
   rotulos: data/lab/teste_labels.csv
   metadado: null            # metadado do laboratório (.meta.json); null = procura ao lado do pcap
 saida: results/
+avaliacao:
+  tolerancia_rotulo_s: 0.0  # D38: janelas em [t_inicio - tol, t_inicio) e (t_fim, t_fim + tol] não são
+                            # positivas nem benignas; 0 = rótulos exatos (laboratório)
+  sensibilidade_tolerancia_s: []  # tolerâncias extras avaliadas por experiments/run.py
+# tau_hs_origem: documentacao_dataset  # D39: origem de tau_hs_s gravada em run.json quando ele não
+                                       # vem do metadado do laboratório (opcional)

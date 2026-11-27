@@ -34,6 +34,7 @@ from tcpmon.eval.windows import (
     detectadas,
     latencia_episodio,
     rotular,
+    tolerancia_da_execucao,
 )
 from tcpmon.io.labels import read_labels, validar
 from tcpmon.io.pcap_reader import sha256_arquivo
@@ -180,7 +181,14 @@ def _pfa_por_servidor(ex: Execucao, rot, servidores: list[str]) -> list[dict]:
     return out
 
 
-def avaliar(runs: list[str | Path], rotulos: str | Path, saida: str | Path | None = None) -> Path:
+def avaliar(
+    runs: list[str | Path], rotulos: str | Path, saida: str | Path | None = None, tolerancia: float | None = None
+) -> Path:
+    """Avalia as execuções contra os rótulos.
+
+    ``tolerancia`` (D38) sobrescreve ``avaliacao.tolerancia_rotulo_s`` gravada nas execuções;
+    serve para a análise de sensibilidade.
+    """
     execs = [Execucao(Path(p)) for p in runs]
     configs = [e.config for e in execs]
     if len(set(configs)) != len(configs):
@@ -194,9 +202,24 @@ def avaliar(runs: list[str | Path], rotulos: str | Path, saida: str | Path | Non
             raise ValueError("execuções sobre pcaps diferentes")
     execs.sort(key=lambda e: e.config)
 
+    if tolerancia is None:
+        tols = {tolerancia_da_execucao(e.run) for e in execs}
+        if len(tols) != 1:
+            raise ValueError(f"execuções com tolerâncias de rótulo diferentes: {sorted(tols)}")
+        tolerancia = tols.pop()
+    if tolerancia < 0:
+        raise ValueError(f"tolerância de rótulo negativa: {tolerancia}")
+
     episodios = read_labels(rotulos)
     problemas = validar(episodios)
-    rot = rotular(episodios, float(ref["t0"]), float(ref["janela_s"]), int(ref["janelas_completas"]), float(ref["tau_hs_s"]))
+    rot = rotular(
+        episodios,
+        float(ref["t0"]),
+        float(ref["janela_s"]),
+        int(ref["janelas_completas"]),
+        float(ref["tau_hs_s"]),
+        float(tolerancia),
+    )
     classes = rot.classes
 
     if saida is None:
@@ -214,6 +237,7 @@ def avaliar(runs: list[str | Path], rotulos: str | Path, saida: str | Path | Non
         det[ex.config] = d
         fa += _alertas_por_motivo(ex, rot.benigna, "benigna")
         trans += _alertas_por_motivo(ex, rot.transicao, "transicao")
+        trans += _alertas_por_motivo(ex, rot.tolerancia, "tolerancia")  # D38
         fora = sum(len(v) for i, v in ex.por_janela.items() if not (0 <= i < rot.n))
         dsp = ex.run["desempenho"]
         desemp.append(
@@ -321,6 +345,8 @@ def avaliar(runs: list[str | Path], rotulos: str | Path, saida: str | Path | Non
         "janelas_completas": rot.n,
         "janelas_benignas": int(rot.benigna.sum()),
         "janelas_transicao": int(rot.transicao.sum()),
+        "tolerancia_rotulo_s": float(tolerancia),
+        "janelas_tolerancia": int(rot.tolerancia.sum()),
         "janelas_positivas_por_classe": {c: int(rot.positivas[c].sum()) for c in classes},
     }
     (saida / "avaliacao.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False))
@@ -341,7 +367,9 @@ def _resumo(meta, metricas, testes, desemp, inclusao, pfa_srv=()) -> str:
         "# Resultados da avaliação",
         "",
         f"- Janela W = {meta['janela_s']} s; τ_hs = {meta['tau_hs_s']} s; {meta['janelas_completas']} janelas completas "
-        f"({meta['janelas_benignas']} benignas, {meta['janelas_transicao']} de transição).",
+        f"({meta['janelas_benignas']} benignas, {meta['janelas_transicao']} de transição, "
+        f"{meta['janelas_tolerancia']} de tolerância de rótulo).",
+        f"- Tolerância de rótulo (D38): ±{meta['tolerancia_rotulo_s']:g} s.",
         f"- Rótulos: `{meta['rotulos']}` (problemas encontrados: {len(meta['problemas_nos_rotulos'])}).",
         "",
         "## P_D por classe e configuração (IC de Wilson 95%)",

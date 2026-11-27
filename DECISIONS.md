@@ -631,3 +631,59 @@ quando houver poucos retratos.
 
 **Decisão da equipe (2026-11-26):** mantida como está. O k empírico continua vindo da calibração
 com o mesmo W da execução, e os resultados de W = 5 s e 10 s (k = 1) são reportados como estão.
+
+### D56 — Implementação da tolerância de rótulo (D38)
+2026-11-27 · fase 9 · aberta
+
+- Parâmetro `avaliacao.tolerancia_rotulo_s` no YAML, obrigatório (0 em `default.yaml`, que é
+  o valor do laboratório, com rótulos exatos). O bloco `avaliacao` passa a ser obrigatório na
+  configuração.
+- Zona de tolerância: janelas que intersectam `[t_inicio − tol, t_inicio)` ou
+  `(t_fim, t_fim + tol]` de algum episódio. Precedência: positiva > transição > tolerância.
+  Uma janela positiva para qualquer episódio continua positiva, e uma janela que já está na
+  transição de τ_hs fica na transição. Benigna é a janela fora das três zonas.
+- Os alertas das janelas de tolerância vão para `transicao.csv` com `tipo_janela = tolerancia`.
+  `avaliacao.json` grava a tolerância usada e o número de janelas de tolerância.
+- A validação analítica usa a mesma rotulagem para escolher os retratos benignos do teste, de
+  modo que a P_FA empírica dela e a da avaliação vêm das mesmas janelas.
+- Sensibilidade (0, 60 e 300 s na D38): `tcpmon eval --tolerancia <s>` reavalia as mesmas
+  execuções; `experiments/run.py` faz isso para cada valor de
+  `avaliacao.sensibilidade_tolerancia_s` e grava em `eval-<data>/tolerancia_<s>s/`. A validação
+  analítica roda só com a tolerância principal.
+- Execuções antigas, sem `avaliacao` gravada em `run.json`, só são avaliadas com `--tolerancia`
+  explícito; a avaliação não supõe um valor.
+- Com tolerância 0, as tabelas do laboratório saem byte a byte iguais às da v0.5.0.
+
+### D57 — Origem declarada de τ_hs (D39)
+2026-11-27 · fase 9 · aberta
+
+Chave opcional `tau_hs_origem` (texto) no YAML. Quando o τ_hs não vem do metadado do
+laboratório, `run.json` grava essa origem (por exemplo, `documentacao_dataset`); sem a chave,
+grava `configuração (tau_hs_s)`, como antes. O metadado do laboratório continua tendo
+prioridade. A análise de sensibilidade com o padrão do Windows Server (D39) é só outro arquivo
+de experimento com `tau_hs_s` diferente; o valor depende da fonte oficial da Microsoft, ainda
+pendente com a equipe.
+
+### D58 — Formato da agenda transcrita e conversão para `labels.csv` (D38)
+2026-11-27 · fase 9 · aberta
+
+- A agenda oficial é transcrita pela equipe num CSV com as colunas `episodio, classe, data,
+  inicio, fim, fuso, chave_tipo, chave_valor`; colunas extras (como `ataque_oficial` e `fonte`)
+  vão para `parametros`, junto com data, horários e fuso originais e o número da linha.
+  `tcpmon agenda` faz a conversão.
+- `fuso` aceita nome IANA ou deslocamento fixo. Com nome IANA, o horário de verão é aplicado
+  pela base do sistema (`America/Moncton` em julho = ADT, UTC−3); com deslocamento fixo
+  (`-03:00`, como diz a D38), o valor é usado tal como está.
+- Conversão literal: `inicio` e `fim` são os instantes da agenda, sem arredondar o minuto. Se a
+  agenda diz 10:10, o fim é 10:10:00; os segundos restantes daquele minuto ficam a cargo da
+  tolerância de ±60 s. Horário de fim antes do início (por exemplo, cruzando a meia-noite),
+  episódio duplicado, `chave_tipo` desconhecido, classe vazia e chave que não é IP são
+  reportados, nunca corrigidos (regra 7).
+- Uma linha tem uma única chave (um IP). Um ataque com vários atacantes, ou contra várias
+  vítimas, vira várias linhas com o mesmo horário; na avaliação por janela isso não muda nada
+  (a janela é detectada se algum alerta casa com alguma das chaves), mas latência e contagem
+  de episódios passam a ser por linha. **Para a equipe:** confirmar se é assim que querem tratar
+  ataques com vários IPs.
+- O mapeamento dos ataques do dataset para as classes do monitor (`classe`, `chave_tipo`) é da
+  equipe e vem pronto na planilha; o conversor não interpreta o nome do ataque.
+

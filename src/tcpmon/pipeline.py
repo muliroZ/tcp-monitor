@@ -123,7 +123,10 @@ def caminho_metadado(cfg: Config, pcap: Path) -> Path | None:
 
 
 def resolver_tau(cfg: Config, pcap: Path) -> tuple[float, str, dict | None]:
-    """τ_hs: sysctl do servidor do laboratório (metadado), senão a configuração."""
+    """τ_hs: sysctl do servidor do laboratório (metadado), senão a configuração.
+
+    Sem metadado, a origem gravada é ``tau_hs_origem`` da configuração (D39), se houver.
+    """
     meta_path = caminho_metadado(cfg, pcap)
     if meta_path is not None:
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
@@ -136,6 +139,8 @@ def resolver_tau(cfg: Config, pcap: Path) -> tuple[float, str, dict | None]:
                 f"rto_inicial_s={cfg.rto_inicial_s} -> {tau:g} s"
             )
             return tau, origem, meta
+    if cfg.tau_hs_origem:  # D39
+        return cfg.tau_hs_s, cfg.tau_hs_origem, None
     return cfg.tau_hs_s, "configuração (tau_hs_s)", None
 
 

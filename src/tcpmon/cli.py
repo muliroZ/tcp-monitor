@@ -84,7 +84,7 @@ def _cmd_calibrate(args: argparse.Namespace) -> int:
 def _cmd_eval(args: argparse.Namespace) -> int:
     from tcpmon.eval.metrics import avaliar
 
-    pasta = avaliar(args.run, args.rotulos, args.saida)
+    pasta = avaliar(args.run, args.rotulos, args.saida, tolerancia=args.tolerancia)
     print(pasta)
     if not args.quieto:
         print((pasta / "resumo.md").read_text(encoding="utf-8"))
@@ -95,6 +95,16 @@ def _cmd_analytic(args: argparse.Namespace) -> int:
     from tcpmon.analytic.validacao import validar_modelo
 
     print(validar_modelo(args.calibracao, args.teste, figuras=not args.sem_figuras))
+    return 0
+
+
+def _cmd_agenda(args: argparse.Namespace) -> int:
+    from tcpmon.io.agenda import agenda_para_rotulos
+
+    problemas = agenda_para_rotulos(args.entrada, args.saida)
+    print(args.saida)
+    for p in problemas:
+        print(f"problema (não corrigido): {p}", file=sys.stderr)
     return 0
 
 
@@ -137,6 +147,12 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("--rotulos", required=True, help="labels.csv dos episódios")
     e.add_argument("--saida", default=None, help="pasta das tabelas (padrão: <pasta da 1ª execução>/../eval-<data>)")
     e.add_argument("--quieto", action="store_true", help="não imprime o resumo")
+    e.add_argument(
+        "--tolerancia",
+        type=float,
+        default=None,
+        help="tolerância de rótulo em segundos (D38); padrão: avaliacao.tolerancia_rotulo_s das execuções",
+    )
     e.set_defaults(func=_cmd_eval)
 
     a = sub.add_parser("analytic", help="validação analítica (M/G/∞) e suas figuras")
@@ -144,6 +160,11 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--teste", required=True, help="pasta de uma execução C3 sobre o pcap de teste")
     a.add_argument("--sem-figuras", action="store_true", help="não gera as figuras")
     a.set_defaults(func=_cmd_analytic)
+
+    g = sub.add_parser("agenda", help="converte a agenda oficial de ataques (CSV transcrito) em labels.csv (D38)")
+    g.add_argument("--entrada", required=True, help="agenda transcrita (ver tcpmon/io/agenda.py)")
+    g.add_argument("--saida", required=True, help="labels.csv de destino")
+    g.set_defaults(func=_cmd_agenda)
 
     return p
 

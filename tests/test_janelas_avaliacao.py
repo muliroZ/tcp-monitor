@@ -8,7 +8,15 @@ from conftest import FIXTURES, REPO
 
 from tcpmon.alerts import Alerta
 from tcpmon.cli import main
-from tcpmon.eval.windows import alertas_por_janela, com_alerta, detectadas, latencia_episodio, rotular
+from tcpmon.eval.windows import (
+    alertas_por_janela,
+    com_alerta,
+    detectadas,
+    janelas_antes,
+    janelas_depois,
+    latencia_episodio,
+    rotular,
+)
 from tcpmon.io.labels import Episodio
 
 
@@ -30,6 +38,39 @@ def test_positivas_transicao_benignas():
     assert list(np.flatnonzero(r.transicao)) == [14, 15, 16, 17, 18, 31, 32, 33, 34, 35]
     assert not r.benigna[10] and not r.benigna[14] and r.benigna[19] and r.benigna[9]
     assert r.benigna.sum() == 100 - 4 - 1 - 10
+
+
+def test_tolerancia_zero_nao_cria_zona():
+    r0 = rotular(EPS, t0=0.0, w=1.0, n=100, tau=5.0)
+    r = rotular(EPS, t0=0.0, w=1.0, n=100, tau=5.0, tolerancia=0.0)
+    assert not r.tolerancia.any()
+    assert (r.benigna == r0.benigna).all() and (r.transicao == r0.transicao).all()
+
+
+def test_tolerancia_menor_que_tau():
+    """D38: [t_inicio − tol, t_inicio) e (t_fim, t_fim + tol] saem das benignas."""
+    r = rotular(EPS, t0=0.0, w=1.0, n=100, tau=5.0, tolerancia=3.0)
+    # Depois do fim, a tolerância (3 s) cai dentro da transição (5 s): nada novo.
+    assert list(np.flatnonzero(r.tolerancia)) == [7, 8, 9, 27, 28, 29]
+    assert list(np.flatnonzero(r.positivas["xmas"])) == [10, 11, 12, 13]  # positivas não mudam
+    assert list(np.flatnonzero(r.transicao)) == [14, 15, 16, 17, 18, 31, 32, 33, 34, 35]
+    assert not (r.tolerancia & r.benigna).any() and not (r.tolerancia & r.transicao).any()
+    assert r.benigna.sum() == 100 - 5 - 10 - 6
+
+
+def test_tolerancia_maior_que_tau():
+    r = rotular(EPS, t0=0.0, w=1.0, n=100, tau=5.0, tolerancia=8.0)
+    esperado = [*range(2, 10), 19, 20, 21, *range(22, 30), 36, 37, 38]
+    assert list(np.flatnonzero(r.tolerancia)) == esperado
+    assert r.benigna.sum() == 100 - 5 - 10 - len(esperado)
+
+
+def test_janelas_de_tolerancia_nas_bordas():
+    # [8, 10): a janela 10 começa em 10 e fica fora; (13, 15]: a janela 15 contém 15.
+    assert list(janelas_antes(10.0, 2.0, 0.0, 1.0, 100)) == [8, 9]
+    assert list(janelas_depois(13.0, 2.0, 0.0, 1.0, 100)) == [13, 14, 15]
+    assert list(janelas_antes(1.0, 5.0, 0.0, 1.0, 100)) == [0]  # corta no início da captura
+    assert list(janelas_depois(98.5, 5.0, 0.0, 1.0, 100)) == [98, 99]  # e no fim
 
 
 def test_deteccao_exige_chave_e_janela():
@@ -85,3 +126,11 @@ def test_eval_ponta_a_ponta(tmp_path):
     assert set(pf["servidor"]) == {"10.77.0.10"} and set(pf["config"]) == {"C1", "C2", "C3"}
     inc = json.loads((saida / "inclusao.json").read_text())
     assert inc["C1_em_C2"]["violacoes"] == 0 and inc["C2_em_C3"]["violacoes"] == 0
+    av = json.loads((saida / "avaliacao.json").read_text())
+    assert av["tolerancia_rotulo_s"] == 0.0 and av["janelas_tolerancia"] == 0  # lab.yaml: rótulos exatos
+    # D38: --tolerancia sobrescreve a da configuração; mesmas execuções, outra rotulagem.
+    saida60 = tmp_path / "eval60"
+    assert main(args[:4] + [str(saida60)] + args[5:] + ["--tolerancia", "60"]) == 0
+    av60 = json.loads((saida60 / "avaliacao.json").read_text())
+    assert av60["tolerancia_rotulo_s"] == 60.0 and av60["janelas_tolerancia"] > 0
+    assert av60["janelas_benignas"] + av60["janelas_tolerancia"] <= av["janelas_benignas"]

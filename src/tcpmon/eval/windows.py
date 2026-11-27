@@ -6,7 +6,11 @@ Janelas ``[t0 + i·W, t0 + (i+1)·W)``, i = 0 … n−1 (n = janelas completas d
 - **Zona de transição:** janelas que intersectam ``[t_fim, t_fim + τ_hs]`` de um episódio e não
   são positivas para ele não são nem positivas nem benignas (D42). Os alertas delas são
   reportados à parte.
-- Uma janela é **benigna** se não intersecta nenhum episódio nem zona de transição.
+- **Zona de tolerância (D38):** janelas que intersectam ``[t_inicio − tol, t_inicio)`` ou
+  ``(t_fim, t_fim + tol]`` de um episódio e não são positivas nem de transição. Também não são
+  positivas nem benignas; os alertas delas são reportados à parte. ``tol = 0`` não cria zona.
+- Uma janela é **benigna** se não intersecta nenhum episódio, zona de transição ou zona de
+  tolerância.
 - Uma janela positiva é **detectada** se tem ao menos um alerta cuja chave casa com a chave de
   um episódio da classe que a intersecta (mesmo IP de origem ou mesmo servidor alvo).
 - Uma janela benigna é **falso alarme** se tem qualquer alerta.
@@ -32,6 +36,24 @@ def intervalo_janelas(t_ini: float, t_fim: float, t0: float, w: float, n: int) -
     return range(i0, i1 + 1) if i1 >= i0 else range(0)
 
 
+def janelas_antes(t_inicio: float, tol: float, t0: float, w: float, n: int) -> range:
+    """Índices das janelas que intersectam o intervalo semiaberto [t_inicio − tol, t_inicio)."""
+    if tol <= 0:
+        return range(0)
+    i0 = max(0, math.floor((t_inicio - tol - t0) / w))
+    i1 = min(n - 1, math.ceil((t_inicio - t0) / w) - 1)
+    return range(i0, i1 + 1) if i1 >= i0 else range(0)
+
+
+def janelas_depois(t_fim: float, tol: float, t0: float, w: float, n: int) -> range:
+    """Índices das janelas que intersectam o intervalo semiaberto (t_fim, t_fim + tol]."""
+    if tol <= 0:
+        return range(0)
+    i0 = max(0, math.floor((t_fim - t0) / w))
+    i1 = min(n - 1, math.floor((t_fim + tol - t0) / w))
+    return range(i0, i1 + 1) if i1 >= i0 else range(0)
+
+
 @dataclass
 class Rotulagem:
     n: int
@@ -39,8 +61,10 @@ class Rotulagem:
     w: float
     tau: float
     episodios: list[Episodio]
+    tolerancia_s: float = 0.0
     positivas: dict[str, np.ndarray] = field(default_factory=dict)  # classe -> bool[n]
     transicao: np.ndarray | None = None
+    tolerancia: np.ndarray | None = None  # D38
     benigna: np.ndarray | None = None
     janelas_do_episodio: dict[str, range] = field(default_factory=dict)
     # (classe, janela) -> chaves dos episódios da classe que intersectam a janela
@@ -51,10 +75,13 @@ class Rotulagem:
         return sorted(self.positivas)
 
 
-def rotular(episodios: list[Episodio], t0: float, w: float, n: int, tau: float) -> Rotulagem:
-    r = Rotulagem(n=n, t0=t0, w=w, tau=tau, episodios=list(episodios))
+def rotular(
+    episodios: list[Episodio], t0: float, w: float, n: int, tau: float, tolerancia: float = 0.0
+) -> Rotulagem:
+    r = Rotulagem(n=n, t0=t0, w=w, tau=tau, episodios=list(episodios), tolerancia_s=tolerancia)
     qualquer_positiva = np.zeros(n, dtype=bool)
     transicao = np.zeros(n, dtype=bool)
+    tolerancia_z = np.zeros(n, dtype=bool)
     chaves: dict[tuple[str, int], set] = defaultdict(set)
     for e in episodios:
         pos = r.positivas.setdefault(e.classe, np.zeros(n, dtype=bool))
@@ -67,10 +94,24 @@ def rotular(episodios: list[Episodio], t0: float, w: float, n: int, tau: float) 
         for i in intervalo_janelas(e.t_fim, e.t_fim + tau, t0, w, n):
             if i not in jan:
                 transicao[i] = True
+        for i in (*janelas_antes(e.t_inicio, tolerancia, t0, w, n), *janelas_depois(e.t_fim, tolerancia, t0, w, n)):
+            tolerancia_z[i] = True
     r.chaves = dict(chaves)
     r.transicao = transicao & ~qualquer_positiva
-    r.benigna = ~qualquer_positiva & ~transicao
+    r.tolerancia = tolerancia_z & ~qualquer_positiva & ~r.transicao
+    r.benigna = ~qualquer_positiva & ~transicao & ~tolerancia_z
     return r
+
+
+def tolerancia_da_execucao(run: dict) -> float:
+    """D38: ``avaliacao.tolerancia_rotulo_s`` gravada na configuração de uma execução (run.json)."""
+    try:
+        return float(run["config"]["avaliacao"]["tolerancia_rotulo_s"])
+    except (KeyError, TypeError):
+        raise ValueError(
+            f"execução {run.get('run_id', '?')} não registra avaliacao.tolerancia_rotulo_s na configuração; "
+            "informe a tolerância explicitamente (tcpmon eval --tolerancia)"
+        ) from None
 
 
 def casa(alerta: Alerta, chave_tipo: str, chave_valor: str) -> bool:

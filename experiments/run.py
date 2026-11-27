@@ -10,7 +10,8 @@ Para cada configuração de experimento:
 2. calibra k e k_scan no pcap de calibração (só benigno);
 3. executa C1, C2 e C3 sobre o pcap de teste, cada uma num processo próprio (para que o pico
    de memória medido seja o da configuração);
-4. avalia (tcpmon eval) e faz a validação analítica (tcpmon analytic);
+4. avalia (tcpmon eval), repete a avaliação para cada valor de
+   ``avaliacao.sensibilidade_tolerancia_s`` (D38) e faz a validação analítica (tcpmon analytic);
 5. grava ``<saida>/experimento.json`` com as pastas produzidas.
 """
 
@@ -79,6 +80,11 @@ def experimento(caminho: Path, forcar_geracao: bool) -> dict:
     for pasta in execucoes.values():
         args_eval += ["--run", pasta]
     avaliacao = rodar(args_eval)
+    # D38: análise de sensibilidade da tolerância de rótulo, com as mesmas execuções.
+    sensibilidade = {}
+    for tol in cfg.avaliacao.sensibilidade_tolerancia_s:
+        destino = Path(avaliacao) / f"tolerancia_{tol:g}s"
+        sensibilidade[f"{tol:g}"] = rodar(args_eval + ["--tolerancia", repr(tol), "--saida", str(destino)])
     analitica = None
     if "C3" in execucoes:
         analitica = rodar(
@@ -90,6 +96,7 @@ def experimento(caminho: Path, forcar_geracao: bool) -> dict:
         "calibracao": cal,
         "execucoes": execucoes,
         "avaliacao": avaliacao,
+        "sensibilidade_tolerancia": sensibilidade,
         "analitica": analitica,
     }
     saida = REPO / cfg.saida
