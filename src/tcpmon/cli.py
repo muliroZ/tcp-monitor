@@ -98,6 +98,16 @@ def _cmd_analytic(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_agenda(args: argparse.Namespace) -> int:
+    from tcpmon.io.agenda import agenda_para_rotulos
+
+    problemas = agenda_para_rotulos(args.entrada, args.saida)
+    print(args.saida)
+    for p in problemas:
+        print(f"problema (não corrigido): {p}", file=sys.stderr)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="tcpmon",
@@ -150,6 +160,11 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--teste", required=True, help="pasta de uma execução C3 sobre o pcap de teste")
     a.add_argument("--sem-figuras", action="store_true", help="não gera as figuras")
     a.set_defaults(func=_cmd_analytic)
+
+    g = sub.add_parser("agenda", help="converte a agenda oficial de ataques (CSV transcrito) em labels.csv (D38)")
+    g.add_argument("--entrada", required=True, help="agenda transcrita (ver tcpmon/io/agenda.py)")
+    g.add_argument("--saida", required=True, help="labels.csv de destino")
+    g.set_defaults(func=_cmd_agenda)
 
     return p
 

@@ -664,3 +664,26 @@ prioridade. A análise de sensibilidade com o padrão do Windows Server (D39) é
 de experimento com `tau_hs_s` diferente; o valor depende da fonte oficial da Microsoft, ainda
 pendente com a equipe.
 
+### D58 — Formato da agenda transcrita e conversão para `labels.csv` (D38)
+2026-11-27 · fase 9 · aberta
+
+- A agenda oficial é transcrita pela equipe num CSV com as colunas `episodio, classe, data,
+  inicio, fim, fuso, chave_tipo, chave_valor`; colunas extras (como `ataque_oficial` e `fonte`)
+  vão para `parametros`, junto com data, horários e fuso originais e o número da linha.
+  `tcpmon agenda` faz a conversão.
+- `fuso` aceita nome IANA ou deslocamento fixo. Com nome IANA, o horário de verão é aplicado
+  pela base do sistema (`America/Moncton` em julho = ADT, UTC−3); com deslocamento fixo
+  (`-03:00`, como diz a D38), o valor é usado tal como está.
+- Conversão literal: `inicio` e `fim` são os instantes da agenda, sem arredondar o minuto. Se a
+  agenda diz 10:10, o fim é 10:10:00; os segundos restantes daquele minuto ficam a cargo da
+  tolerância de ±60 s. Horário de fim antes do início (por exemplo, cruzando a meia-noite),
+  episódio duplicado, `chave_tipo` desconhecido, classe vazia e chave que não é IP são
+  reportados, nunca corrigidos (regra 7).
+- Uma linha tem uma única chave (um IP). Um ataque com vários atacantes, ou contra várias
+  vítimas, vira várias linhas com o mesmo horário; na avaliação por janela isso não muda nada
+  (a janela é detectada se algum alerta casa com alguma das chaves), mas latência e contagem
+  de episódios passam a ser por linha. **Para a equipe:** confirmar se é assim que querem tratar
+  ataques com vários IPs.
+- O mapeamento dos ataques do dataset para as classes do monitor (`classe`, `chave_tipo`) é da
+  equipe e vem pronto na planilha; o conversor não interpreta o nome do ataque.
+

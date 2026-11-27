@@ -9,6 +9,8 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 - D38 (D56): tolerância de rótulo na avaliação e na validação analítica
   (`avaliacao.tolerancia_rotulo_s`), `tcpmon eval --tolerancia` e análise de sensibilidade em
   `experiments/run.py` (`avaliacao.sensibilidade_tolerancia_s`).
+- D38 (D58): `tcpmon agenda` converte a agenda oficial transcrita (horário local) em
+  `labels.csv` (UTC), sem ajustar nada e reportando problemas.
 - D39 (D57): `tau_hs_origem` na configuração, gravada em `run.json` quando τ_hs não vem do
   metadado do laboratório.
 

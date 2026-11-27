@@ -97,7 +97,26 @@ empíricos dos retratos estacionários. Grava `analytic.json`, `curvas_roc.csv`,
 configuração efetiva): `alerts.csv`, `flows.csv`, `counters.json` e `run.json` (configuração
 completa, commit Git, τ_hs e sua origem, SHA-256 do pcap, versões das bibliotecas, semente,
 pacotes por segundo, pico de fluxos e de memória). τ_hs vem do metadado do laboratório
-(`<pcap>.meta.json`) quando existe; senão, de `tau_hs_s`.
+(`<pcap>.meta.json`) quando existe; senão, de `tau_hs_s`, com a origem de `tau_hs_origem` (D39).
+
+### Rótulos dos datasets reais
+
+A agenda oficial de ataques é transcrita pela equipe num CSV, uma linha por episódio, com
+horários locais. `tcpmon agenda` converte para `labels.csv` em UTC, o mesmo relógio do pcap
+(D38, D58):
+
+```bash
+tcpmon agenda --entrada data/cicids2017/agenda.csv --saida data/cicids2017/labels.csv
+```
+
+```
+episodio,classe,data,inicio,fim,fuso,chave_tipo,chave_valor,ataque_oficial
+```
+
+`fuso` aceita nome IANA (`America/Moncton`) ou deslocamento fixo (`-03:00`). Colunas extras
+vão para `parametros`. A conversão é literal: nada é ajustado ou descartado, e os problemas
+(horário de fim antes do início, episódio duplicado, chave que não é IP) são impressos sem
+correção.
 
 Exemplo de saída:
 
