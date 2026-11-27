@@ -66,6 +66,8 @@ class AvaliacaoCfg:
     tolerancia_rotulo_s: float
     # Valores extras de tolerância avaliados como análise de sensibilidade (experiments/run.py).
     sensibilidade_tolerancia_s: tuple[float, ...]
+    # D64: classes de episódio cujas janelas não são positivas nem benignas.
+    classes_fora_da_conta: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -156,6 +158,14 @@ def _num(
     return valor
 
 
+def _lista_texto(valor: Any, nome: str) -> tuple[str, ...]:
+    if valor is None:
+        return ()
+    if not isinstance(valor, list) or not all(isinstance(v, str) and v for v in valor):
+        raise ConfigError(f"'{nome}' precisa ser uma lista de textos, recebido {valor!r}")
+    return tuple(valor)
+
+
 def _servidores(valor: Any) -> tuple[str, ...] | None:
     if valor is None:
         return None
@@ -239,6 +249,7 @@ def from_dict(raw: dict[str, Any], origem: str | None = None) -> Config:
         sensibilidade_tolerancia_s=tuple(
             _num({"v": v}, "v", 0.0, nome="avaliacao.sensibilidade_tolerancia_s") for v in sens
         ),
+        classes_fora_da_conta=_lista_texto(av.get("classes_fora_da_conta"), "avaliacao.classes_fora_da_conta"),
     )
     tau_origem = raw.get("tau_hs_origem")
     if tau_origem is not None and not isinstance(tau_origem, str):

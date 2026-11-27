@@ -33,6 +33,7 @@ from tcpmon.eval.windows import (
     com_alerta,
     detectadas,
     latencia_episodio,
+    fora_da_conta_da_execucao,
     rotular,
     tolerancia_da_execucao,
 )
@@ -210,6 +211,11 @@ def avaliar(
     if tolerancia < 0:
         raise ValueError(f"tolerância de rótulo negativa: {tolerancia}")
 
+    foras = {fora_da_conta_da_execucao(e.run) for e in execs}
+    if len(foras) != 1:
+        raise ValueError(f"execuções com classes fora da conta diferentes: {[sorted(f) for f in foras]}")
+    fora_da_conta = foras.pop()
+
     episodios = read_labels(rotulos)
     problemas = validar(episodios)
     rot = rotular(
@@ -219,6 +225,7 @@ def avaliar(
         int(ref["janelas_completas"]),
         float(ref["tau_hs_s"]),
         float(tolerancia),
+        fora_da_conta,
     )
     classes = rot.classes
 
@@ -238,6 +245,7 @@ def avaliar(
         fa += _alertas_por_motivo(ex, rot.benigna, "benigna")
         trans += _alertas_por_motivo(ex, rot.transicao, "transicao")
         trans += _alertas_por_motivo(ex, rot.tolerancia, "tolerancia")  # D38
+        trans += _alertas_por_motivo(ex, rot.fora_da_conta, "fora_da_conta")  # D64
         fora = sum(len(v) for i, v in ex.por_janela.items() if not (0 <= i < rot.n))
         dsp = ex.run["desempenho"]
         desemp.append(
@@ -347,6 +355,9 @@ def avaliar(
         "janelas_transicao": int(rot.transicao.sum()),
         "tolerancia_rotulo_s": float(tolerancia),
         "janelas_tolerancia": int(rot.tolerancia.sum()),
+        "classes_fora_da_conta": sorted(fora_da_conta),
+        "episodios_fora_da_conta": len(rot.episodios_fora_da_conta),
+        "janelas_fora_da_conta": int(rot.fora_da_conta.sum()),
         "janelas_positivas_por_classe": {c: int(rot.positivas[c].sum()) for c in classes},
     }
     (saida / "avaliacao.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False))
@@ -368,7 +379,7 @@ def _resumo(meta, metricas, testes, desemp, inclusao, pfa_srv=()) -> str:
         "",
         f"- Janela W = {meta['janela_s']} s; τ_hs = {meta['tau_hs_s']} s; {meta['janelas_completas']} janelas completas "
         f"({meta['janelas_benignas']} benignas, {meta['janelas_transicao']} de transição, "
-        f"{meta['janelas_tolerancia']} de tolerância de rótulo).",
+        f"{meta['janelas_tolerancia']} de tolerância de rótulo, {meta['janelas_fora_da_conta']} fora da conta).",
         f"- Tolerância de rótulo (D38): ±{meta['tolerancia_rotulo_s']:g} s.",
         f"- Rótulos: `{meta['rotulos']}` (problemas encontrados: {len(meta['problemas_nos_rotulos'])}).",
         "",

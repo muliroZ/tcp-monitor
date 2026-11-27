@@ -173,12 +173,101 @@ demais dias são teste. Nada medido no teste volta para a escolha de parâmetros
 - A conversão (`conn_state` do Zeek, como S0, REJ e SH, e as assinaturas do Suricata para as
   classes de anomalia) é registrada aqui, item por item, antes da execução.
 
+### D59 — Levantamento nas páginas oficiais (D37) **[equipe]**
+2026-11-27 · fase 9 · decidida · os fatos foram levantados pelo projeto e são conferidos pela equipe
+
+Fontes: <https://www.unb.ca/cic/datasets/ids-2017.html> e
+<https://www.unb.ca/cic/datasets/ddos-2019.html> (lidas em 2026-11-27).
+
+**CIC-IDS2017** (confirmado na página):
+- Captura de 9h de segunda, 3/7/2017, até 17h de sexta, 7/7/2017; "Monday is the normal day
+  and only includes the benign traffic" (confirma a D40).
+- Ataques e horários por dia, transcritos em `configs/rotulos/cicids2017_agenda.csv`.
+- Rede das vítimas: Web server 16 (192.168.10.50), Ubuntu server 12 (192.168.10.51), quatro
+  Ubuntu clientes, Win 7, Win 8.1, Win Vista, dois Win 10 e um MAC; DNS/DC 192.168.10.3;
+  firewall 205.174.165.80 / 172.16.0.1. Atacantes: Kali 205.174.165.73 e três Win 8.1
+  (205.174.165.69–71).
+- NAT: o tráfego do atacante segue "205.174.165.73 -> 205.174.165.80 -> 172.16.0.1 ->
+  192.168.10.50"; a página não diz com que IP o atacante aparece na captura interna.
+- Não há SYN Flood: os DoS são de aplicação (slowloris, Slowhttptest, Hulk, GoldenEye) e o DDoS
+  é "LOIT" (confirma a D37). O PortScan de sexta é vertical (um alvo) e usa vários tipos de
+  varredura do nmap.
+- Tamanhos: segunda 11,0 GB; terça 11 GB; quarta 13 GB; quinta 7,8 GB; sexta 8,3 GB.
+
+**CIC-DDoS2019** (confirmado na página):
+- "First Day": PortMap 9:43–9:51, NetBIOS 10:00–10:09, LDAP 10:21–10:30, MSSQL 10:33–10:42,
+  UDP 10:53–11:03, UDP-Lag 11:14–11:24, **SYN 11:28–17:35**. "Second Day": 12 ataques; SYN
+  13:29–13:34. O texto chama um dia de treino e outro de teste, mas a tabela não liga os rótulos
+  "First Day" e "Second Day" a treino e teste.
+- Servidor Ubuntu 16.04: 192.168.50.1 no primeiro dia e 192.168.50.4 no segundo. PCs Windows:
+  192.168.50.5–8 no primeiro dia; 192.168.50.6–9 no segundo. Firewall Fortinet 205.174.165.81.
+
+**Não está nas páginas, e fica para conferir no pcap:**
+- Fuso dos horários, nos dois datasets. A D38 supôs UTC−3 (ADT); confere-se pelo primeiro
+  pacote da segunda-feira (captura iniciada às 9h).
+- Com que IP o atacante aparece na captura interna do CIC-IDS2017 (D63).
+- Datas dos dias do CIC-DDoS2019, início de cada captura e alvo de cada ataque (o servidor é a
+  única máquina listada, mas a página não diz que é o alvo do SYN Flood).
+- Endereços dos atacantes do CIC-DDoS2019.
+
+### D60 — Download só do necessário **[equipe]**
+2026-11-27 · fase 9 · decidida
+
+Primeiro: segunda-feira (calibração) e sexta-feira (proposta: PortScan com Xmas, NULL e ACK,
+mais o DDoS LOIT) do CIC-IDS2017, e o primeiro dia do CIC-DDoS2019 (SYN Flood de 6 h). Os
+demais dias vêm depois. O download exige um formulário com dados pessoais (nome, e-mail,
+instituição, cargo e país), que a equipe preenche; os arquivos ou o link vão para
+`data/cicids2017/` e `data/cicddos2019/`, e o projeto registra os SHA-256.
+
+### D61 — Calibração do CIC-DDoS2019 no trecho benigno do próprio dia **[equipe]**
+2026-11-27 · fase 9 · decidida
+
+A calibração usa o intervalo do mesmo dia antes do primeiro ataque da agenda (no primeiro dia,
+antes de 9:43); o resto do dia é teste. Vale se o trecho for longo o bastante para estimar k:
+no laboratório, 15 min deram 903 retratos com W = 1 s. O início da captura não está na página
+e será lido no pcap; se o trecho for curto, a questão volta à equipe antes de qualquer execução.
+
+### D62 — Todos os ataques do CIC-IDS2017 são rotulados **[equipe]**
+2026-11-27 · fase 9 · decidida
+
+Todo ataque da agenda vira episódio, para que nenhuma janela de ataque seja contada como
+benigna. Os que têm classe correspondente no monitor usam essa classe: nmap `sX` → `xmas`,
+`sN` → `null`, `sA` → `ack_sem_syn`. Os demais usam o nome oficial como classe própria (por
+exemplo `dos_slowloris`, `portscan_sS`) e têm P_D reportada como está. Isso também serve à
+comparação de cobertura com Zeek e Suricata (D41).
+
+### D63 — Chave dos ataques externos do CIC-IDS2017: conferir no pcap **[equipe]**
+2026-11-27 · fase 9 · decidida · aguardando os pcaps
+
+Antes de fixar a chave, verifica-se no pcap com que IP o atacante aparece (provavelmente
+172.16.0.1) e se esse IP também carrega tráfego benigno de fora. Os números voltam à equipe.
+Até lá, as linhas afetadas da agenda têm `chave_valor = a_confirmar_nat`, que o conversor
+aponta como problema.
+
+### D64 — PortScan com firewall ligado fica fora da conta **[equipe]**
+2026-11-27 · fase 9 · decidida
+
+As 12 janelas do PortScan com "Firewall Rule on" (sexta, 13:55–14:35) não são positivas nem
+benignas, e os alertas delas são reportados à parte. A contagem de pacotes do atacante nessas
+janelas é registrada quando os pcaps chegarem. Classe na agenda: `portscan_firewall_ligado`,
+listada em `avaliacao.classes_fora_da_conta`.
+
+### D65 — Sem sensibilidade de τ_hs com o Windows Server **[equipe]**
+2026-11-27 · fase 9 · decidida · revê parte da D39
+
+A Microsoft documenta o RTO inicial (3 s; `MSFT_NetTCPSetting`, "Description of Windows TCP
+features"), mas não o número de retransmissões do SYN-ACK no servidor. Sem fonte oficial, a
+análise de sensibilidade com o Windows sai da D39. Os servidores monitorados pelo agregador
+nos dois datasets são Ubuntu (Linux), e para eles τ_hs = 63 s (D39).
+
 ### Pendências que continuam com a equipe
 
-- Conferir na página da UNB os fatos listados na D37 e preencher `agregador.servidores`.
-- Baixar os pcaps do CIC-IDS2017 (segunda-feira e dias de ataque) e do dia de SYN Flood do
-  CIC-DDoS2019. A equipe ainda não os tem.
-- Definir a calibração do CIC-DDoS2019 (D37).
+- Preencher o formulário de download e trazer os pcaps da D60.
+- Conferir os fatos da D59 e os rascunhos de agenda em `configs/rotulos/` (classes, chaves e
+  horários transcritos).
+- Depois dos pcaps: fuso (D59), chave dos ataques externos (D63), datas, início da captura e
+  alvo no CIC-DDoS2019 (D59, D61), e `agregador.servidores` dos dois datasets (proposta:
+  192.168.10.50 e 192.168.10.51 no CIC-IDS2017; 192.168.50.1 no primeiro dia do CIC-DDoS2019).
 
 ---
 
@@ -664,8 +753,8 @@ prioridade. A análise de sensibilidade com o padrão do Windows Server (D39) é
 de experimento com `tau_hs_s` diferente; o valor depende da fonte oficial da Microsoft, ainda
 pendente com a equipe.
 
-### D58 — Formato da agenda transcrita e conversão para `labels.csv` (D38)
-2026-11-27 · fase 9 · aberta
+### D58 — Formato da agenda transcrita e conversão para `labels.csv` (D38) **[equipe]**
+2026-11-27 · fase 9 · decidida
 
 - A agenda oficial é transcrita pela equipe num CSV com as colunas `episodio, classe, data,
   inicio, fim, fuso, chave_tipo, chave_valor`; colunas extras (como `ataque_oficial` e `fonte`)
@@ -682,8 +771,45 @@ pendente com a equipe.
 - Uma linha tem uma única chave (um IP). Um ataque com vários atacantes, ou contra várias
   vítimas, vira várias linhas com o mesmo horário; na avaliação por janela isso não muda nada
   (a janela é detectada se algum alerta casa com alguma das chaves), mas latência e contagem
-  de episódios passam a ser por linha. **Para a equipe:** confirmar se é assim que querem tratar
-  ataques com vários IPs.
+  de episódios passam a ser por linha. **Decisão da equipe (2026-11-27):** mantido assim, uma
+  linha por IP.
 - O mapeamento dos ataques do dataset para as classes do monitor (`classe`, `chave_tipo`) é da
   equipe e vem pronto na planilha; o conversor não interpreta o nome do ataque.
 
+### D66 — Classes fora da conta na avaliação (D64)
+2026-11-27 · fase 9 · aberta
+
+- Chave `avaliacao.classes_fora_da_conta` (lista de classes, vazia em `default.yaml`).
+  Episódios dessas classes não geram janelas positivas nem entram nas tabelas de P_D. As
+  janelas que eles intersectam não são positivas nem benignas, e os alertas delas vão para
+  `transicao.csv` com `tipo_janela = fora_da_conta`.
+- Transição de τ_hs e tolerância de rótulo valem para esses episódios como para os demais:
+  SYNs que tenham passado pelo firewall podem gerar alertas depois do fim.
+- Precedência: positiva > fora da conta > transição > tolerância.
+- A validação analítica usa a mesma rotulagem. Execuções sem a chave gravada são tratadas
+  como lista vazia: é uma lista de nomes, não um valor numérico do experimento.
+
+### D67 — Rascunhos das agendas do CIC-IDS2017 e do CIC-DDoS2019
+2026-11-27 · fase 9 · aberta · para a equipe conferir
+
+`configs/rotulos/cicids2017_agenda.csv` (49 episódios) e
+`configs/rotulos/cicddos2019_dia1_agenda.csv` (7 episódios), transcritos das páginas da D59.
+Cada linha guarda o texto oficial (`ataque_oficial`), atacante e vítima como a página os
+dá, e a URL da fonte. Escolhas de transcrição:
+
+- Horários literais ("10:43 – 11 a.m." → 10:43–11:00; "14:19" sozinho → 14:19–14:19). O fuso
+  `-03:00` do CIC-IDS2017 é o da D38, ainda a conferir no pcap (D59).
+- Uma linha por janela de horário: o Metasploit de quinta tem três (14:19, 14:20–14:21 e
+  14:33–14:35), e o PortScan com firewall ligado tem doze.
+- `chave_tipo` segue a regra do laboratório: `servidor` para DoS e DDoS contra um alvo
+  (192.168.10.50); `origem` para os demais. Os ataques externos com `origem` ficam com
+  `a_confirmar_nat` (D63).
+- Infiltração de quinta, 15:04–15:45: duas linhas, o primeiro passo (atacante externo contra
+  o Vista) e o segundo (o Vista, 192.168.10.8, varre os outros clientes), cada uma com sua
+  origem.
+- Botnet ARES: **proposta** de uma linha por máquina infectada, com a máquina como origem,
+  porque o tráfego de controle sai dela (D58). A página dá o Kali como atacante.
+- Classes próprias com o nome oficial (D62). O `sW` (window scan) também sonda com ACK isolado
+  e poderia ser `ack_sem_syn`; ficou como classe própria até a equipe decidir.
+- CIC-DDoS2019, primeiro dia: data, fuso e alvo ficam `a_confirmar` (D59); o conversor recusa
+  o arquivo até que sejam preenchidos.

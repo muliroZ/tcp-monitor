@@ -118,6 +118,11 @@ vão para `parametros`. A conversão é literal: nada é ajustado ou descartado,
 (horário de fim antes do início, episódio duplicado, chave que não é IP) são impressos sem
 correção.
 
+Os rascunhos transcritos das páginas oficiais ficam em `configs/rotulos/`
+(`cicids2017_agenda.csv`, `cicddos2019_dia1_agenda.csv`; D59, D67) e só viram rótulos depois de a
+equipe conferir. Episódios de classes listadas em `avaliacao.classes_fora_da_conta` (por
+exemplo, `portscan_firewall_ligado`, na D64) não são positivos nem benignos.
+
 Exemplo de saída:
 
 ```

@@ -65,6 +65,23 @@ def test_tolerancia_maior_que_tau():
     assert r.benigna.sum() == 100 - 5 - 10 - len(esperado)
 
 
+def test_classes_fora_da_conta():
+    """D64: episódios dessas classes não são positivos; suas janelas também não são benignas."""
+    eps = [*EPS, Episodio("e3", "portscan_firewall_ligado", 50.0, 52.5, "origem", "10.0.0.66")]
+    r0 = rotular(EPS, t0=0.0, w=1.0, n=100, tau=5.0)
+    r = rotular(eps, t0=0.0, w=1.0, n=100, tau=5.0, fora_da_conta={"portscan_firewall_ligado"})
+    assert "portscan_firewall_ligado" not in r.positivas and [e.episodio for e in r.episodios] == ["e1", "e2"]
+    assert [e.episodio for e in r.episodios_fora_da_conta] == ["e3"]
+    assert list(np.flatnonzero(r.fora_da_conta)) == [50, 51, 52]
+    assert list(np.flatnonzero(r.transicao)) == [*np.flatnonzero(r0.transicao), 53, 54, 55, 56, 57]
+    assert not (r.fora_da_conta & (r.benigna | r.transicao | r.tolerancia)).any()
+    assert r.benigna.sum() == r0.benigna.sum() - 3 - 5
+    # Uma janela positiva de outro episódio continua positiva.
+    eps2 = [*EPS, Episodio("e4", "portscan_firewall_ligado", 11.0, 12.0, "origem", "10.0.0.66")]
+    r2 = rotular(eps2, t0=0.0, w=1.0, n=100, tau=5.0, fora_da_conta={"portscan_firewall_ligado"})
+    assert not r2.fora_da_conta[11] and r2.positivas["xmas"][11]
+
+
 def test_janelas_de_tolerancia_nas_bordas():
     # [8, 10): a janela 10 começa em 10 e fica fora; (13, 15]: a janela 15 contém 15.
     assert list(janelas_antes(10.0, 2.0, 0.0, 1.0, 100)) == [8, 9]
