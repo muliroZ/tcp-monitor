@@ -14,7 +14,15 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 - D39 (D57): `tau_hs_origem` na configuração, gravada em `run.json` quando τ_hs não vem do
   metadado do laboratório.
 
+- D64 (D66): `avaliacao.classes_fora_da_conta`, para episódios cujas janelas não são
+  positivas nem benignas.
+- D59 (D67): rascunhos das agendas do CIC-IDS2017 e do primeiro dia do CIC-DDoS2019 em
+  `configs/rotulos/`, transcritos das páginas oficiais, para a equipe conferir.
+
 ### Alterado
+- D58, D60–D65 decididas pela equipe (levantamento das páginas oficiais, download, calibração do
+  CIC-DDoS2019, rotulagem de todos os ataques, chave do NAT, PortScan com firewall ligado e
+  retirada da sensibilidade com o Windows Server).
 - O bloco `avaliacao` passa a ser obrigatório na configuração (já está em `default.yaml`).
 - D52 decidida pela equipe: os dados do laboratório ficam como estão e a reordenação do
   `netem` é reportada como limitação do artigo.

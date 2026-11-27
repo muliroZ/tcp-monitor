@@ -24,7 +24,7 @@ from scipy import stats
 from tcpmon.analytic.model import b_ataque, k_analitico, p_d, p_fa
 from tcpmon.calibracao import estimar_por_servidor, ler_fluxos
 from tcpmon.eval.stats import wilson
-from tcpmon.eval.windows import rotular, tolerancia_da_execucao
+from tcpmon.eval.windows import fora_da_conta_da_execucao, rotular, tolerancia_da_execucao
 from tcpmon.io.labels import read_labels
 
 log = logging.getLogger(__name__)
@@ -230,6 +230,7 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
         int(run_teste["janelas_completas"]),
         tau,
         tolerancia,
+        fora_da_conta_da_execucao(run_teste),
     )
     retratos = pd.read_csv(pasta_teste / "snapshots.csv")
     retratos["benigna"] = [bool(rot.benigna[j]) if 0 <= j < rot.n else False for j in retratos["janela"]]

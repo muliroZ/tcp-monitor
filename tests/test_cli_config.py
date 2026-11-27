@@ -86,6 +86,11 @@ def test_config_avaliacao_padrao():
     cfg = load_config(REPO / "configs" / "default.yaml")
     assert cfg.avaliacao.tolerancia_rotulo_s == 0.0 and cfg.avaliacao.sensibilidade_tolerancia_s == ()
     assert cfg.tau_hs_origem is None
+    assert cfg.avaliacao.classes_fora_da_conta == ()
+    raw = cfg.raw
+    raw["avaliacao"]["classes_fora_da_conta"] = ["a", 3]
+    with pytest.raises(ConfigError, match="classes_fora_da_conta"):
+        from_dict(raw)
 
 
 def test_tau_origem_declarada(tmp_path):
