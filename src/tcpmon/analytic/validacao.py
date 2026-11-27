@@ -24,7 +24,7 @@ from scipy import stats
 from tcpmon.analytic.model import b_ataque, k_analitico, p_d, p_fa
 from tcpmon.calibracao import estimar_por_servidor, ler_fluxos
 from tcpmon.eval.stats import wilson
-from tcpmon.eval.windows import rotular
+from tcpmon.eval.windows import rotular, tolerancia_da_execucao
 from tcpmon.io.labels import read_labels
 
 log = logging.getLogger(__name__)
@@ -222,8 +222,14 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
 
     # --- Teste: episódios de SYN Flood ----------------------------------------------------
     episodios = read_labels(run_teste["rotulos"]) if run_teste.get("rotulos") else []
+    tolerancia = tolerancia_da_execucao(run_teste)  # D38: mesmas janelas benignas da avaliação
     rot = rotular(
-        episodios, float(run_teste["t0"]), float(run_teste["janela_s"]), int(run_teste["janelas_completas"]), tau
+        episodios,
+        float(run_teste["t0"]),
+        float(run_teste["janela_s"]),
+        int(run_teste["janelas_completas"]),
+        tau,
+        tolerancia,
     )
     retratos = pd.read_csv(pasta_teste / "snapshots.csv")
     retratos["benigna"] = [bool(rot.benigna[j]) if 0 <= j < rot.n else False for j in retratos["janela"]]
@@ -339,6 +345,7 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
         "calibracao": str(pasta_cal),
         "teste": str(pasta_teste),
         "tau_hs_s": tau,
+        "tolerancia_rotulo_s": tolerancia,
         "alfa": alfa,
         "servidores": servidores,
         "k_empirico": k_srv,

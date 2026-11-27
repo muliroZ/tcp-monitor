@@ -70,6 +70,13 @@ de Newcombe), `falsos_alarmes.csv`, `transicao.csv`, `desempenho.csv`, `inclusao
 `resumo.md`. A inclusão C1 ⊆ C2 é verificada por traço rejeitado e C2 ⊆ C3 por alerta
 idêntico (D33); a divergência por janela entre C1 e C2 é reportada à parte.
 
+Tolerância de rótulo (D38): com `avaliacao.tolerancia_rotulo_s` > 0, as janelas em
+`[t_inicio − tol, t_inicio)` e `(t_fim, t_fim + tol]` de cada episódio não são positivas nem
+benignas, e os alertas delas vão para `transicao.csv` com `tipo_janela = tolerancia`. No
+laboratório, a tolerância é 0 (rótulos exatos). `tcpmon eval --tolerancia <s>` sobrescreve o valor
+gravado nas execuções. `experiments/run.py` repete a avaliação para cada valor de
+`avaliacao.sensibilidade_tolerancia_s`, em `eval-<data>/tolerancia_<s>s/`.
+
 ### Validação analítica e reprodução completa
 
 ```bash
@@ -198,6 +205,15 @@ configuração padrão e altera só o necessário:
 base: ../default.yaml
 camadas: [1, 2]
 janela_s: 5.0
+```
+
+Chaves para os datasets reais (fase 9):
+
+```yaml
+tau_hs_origem: documentacao_dataset   # D39: origem de tau_hs_s gravada em run.json
+avaliacao:
+  tolerancia_rotulo_s: 60.0           # D38
+  sensibilidade_tolerancia_s: [0.0, 300.0]
 ```
 
 ## Testes
