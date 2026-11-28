@@ -90,3 +90,21 @@ def test_cli_agenda(tmp_path, capsys):
     eps = read_labels(saida)
     assert [e.episodio for e in eps] == ["d1", "d2"]
     assert eps[0].t_inicio == utc(2017, 7, 5, 12, 47) and eps[0].parametros["ataque_oficial"] == "Ataque A"
+
+
+def test_filtro_por_dia_e_modo_estrito(tmp_path, capsys):
+    p = escrever(
+        tmp_path,
+        "e1,xmas,2017-07-05,09:47,10:10,-03:00,origem,192.0.2.1,\n"
+        "e2,xmas,2017-07-07,09:47,10:10,-03:00,origem,192.0.2.1,\n"
+        "e3,xmas,2017-07-07,11:00,10:00,-03:00,origem,192.0.2.1,\n",
+    )
+    eps, _ = converter(p, dias=["2017-07-07"])
+    assert [e.episodio for e in eps] == ["e2", "e3"]
+    saida = tmp_path / "labels.csv"
+    assert main(["agenda", "--entrada", str(p), "--saida", str(saida), "--dias", "2017-07-05"]) == 0
+    assert [e.episodio for e in read_labels(saida)] == ["e1"]
+    # Com --estrito, problemas (aqui, fim antes do início) encerram com código 2; o arquivo é gravado.
+    assert main(["agenda", "--entrada", str(p), "--saida", str(saida), "--dias", "2017-07-07", "--estrito"]) == 2
+    assert "e3: t_fim < t_inicio" in capsys.readouterr().err
+    assert main(["agenda", "--entrada", str(p), "--saida", str(saida), "--dias", "2017-07-01", "--estrito"]) == 2

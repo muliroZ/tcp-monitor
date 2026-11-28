@@ -19,7 +19,12 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 - D59 (D67): rascunhos das agendas do CIC-IDS2017 e do primeiro dia do CIC-DDoS2019 em
   `configs/rotulos/`, transcritos das páginas oficiais, para a equipe conferir.
 
+- D70: `configs/experiments/cicids2017.yaml` e, em `experiments/run.py`, conversão da agenda
+  para datasets reais; `tcpmon agenda --dias` e `--estrito`.
+
 ### Alterado
+- D63 resolvida (atacante externo como 172.16.0.1); D68 (varreduras sem pacotes na captura fora
+  da conta) e D69 (o pacote baixado do CIC-DDoS2019 é o "Second Day"), decididas pela equipe.
 - D58, D60–D65 decididas pela equipe (levantamento das páginas oficiais, download, calibração do
   CIC-DDoS2019, rotulagem de todos os ataques, chave do NAT, PortScan com firewall ligado e
   retirada da sensibilidade com o Windows Server).

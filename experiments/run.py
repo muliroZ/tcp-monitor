@@ -6,7 +6,8 @@
     python experiments/run.py --todos --gerar         # regenera também os pcaps do laboratório
 
 Para cada configuração de experimento:
-1. gera os pcaps do laboratório se não existirem (ou com --gerar);
+1. gera os pcaps do laboratório se não existirem (ou com --gerar); nos datasets reais
+   (``experimento.agenda``), confere os pcaps e converte a agenda oficial em rótulos;
 2. calibra k e k_scan no pcap de calibração (só benigno);
 3. executa C1, C2 e C3 sobre o pcap de teste, cada uma num processo próprio (para que o pico
    de memória medido seja o da configuração);
@@ -43,7 +44,22 @@ def rodar(cmd: list[str]) -> str:
     return linhas[0] if linhas else ""
 
 
+def dados_de_dataset(cfg, exp: dict) -> None:
+    """Datasets reais: os pcaps já baixados e os rótulos convertidos da agenda (D58)."""
+    for pcap in (REPO / exp["calibracao_pcap"], REPO / cfg.entrada.pcap):
+        if not pcap.exists():
+            raise SystemExit(f"pcap ausente: {pcap.relative_to(REPO)} (baixe o dataset; ver DECISIONS.md, D60)")
+        print(f"[dados] {pcap.relative_to(REPO)}", flush=True)
+    cmd = TCPMON + ["agenda", "--entrada", exp["agenda"], "--saida", cfg.entrada.rotulos, "--estrito"]
+    if exp.get("agenda_dias"):
+        cmd += ["--dias", *map(str, exp["agenda_dias"])]
+    rodar(cmd)
+
+
 def gerar_dados(cfg, exp: dict, forcar: bool) -> None:
+    if "agenda" in exp:
+        dados_de_dataset(cfg, exp)
+        return
     pcap_teste = REPO / cfg.entrada.pcap
     pcap_cal = REPO / exp["calibracao_pcap"]
     pares = (
