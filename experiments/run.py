@@ -85,7 +85,12 @@ def experimento(caminho: Path, forcar_geracao: bool) -> dict:
         raise SystemExit(f"{caminho}: falta a seção 'experimento.calibracao_pcap'")
     gerar_dados(cfg, exp, forcar_geracao)
 
-    cal = rodar(TCPMON + ["calibrate", "--config", str(caminho), "--pcap", exp["calibracao_pcap"]])
+    args_cal = TCPMON + ["calibrate", "--config", str(caminho), "--pcap", exp["calibracao_pcap"]]
+    # D73: recorte da calibração (ex.: trecho benigno antes do primeiro ataque, D61). Sem essas
+    # chaves, a calibração herda entrada.inicio/fim; com elas, o recorte é só o informado.
+    if "calibracao_inicio" in exp or "calibracao_fim" in exp:
+        args_cal += ["--inicio", str(exp.get("calibracao_inicio") or ""), "--fim", str(exp.get("calibracao_fim") or "")]
+    cal = rodar(args_cal)
     execucoes = {}
     for camadas in exp.get("configuracoes", [[1], [1, 2], [1, 2, 3]]):
         rotulo = f"C{max(camadas)}"

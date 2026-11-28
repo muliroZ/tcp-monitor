@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 import socket
 from collections import Counter
 from collections.abc import Iterator
@@ -74,6 +75,10 @@ class ReadCounters:
     inversoes_ordem: int = 0
     primeiro_ts: float | None = None  # primeiro quadro do arquivo (qualquer protocolo)
     max_ts: float | None = None  # maior timestamp visto (qualquer protocolo)
+    ultimo_ts: float | None = None  # timestamp do quadro anterior (conta inversões entre arquivos)
+    arquivos: int = 0
+    antes_do_inicio: int = 0  # quadros com ts < entrada.inicio (não contam em ``lidos``)
+    parou_no_fim: bool = False  # a leitura parou no primeiro quadro com ts >= entrada.fim
 
     def as_dict(self) -> dict:
         return {
@@ -84,6 +89,9 @@ class ReadCounters:
             "inversoes_ordem": self.inversoes_ordem,
             "primeiro_ts": self.primeiro_ts,
             "max_ts": self.max_ts,
+            "arquivos": self.arquivos,
+            "quadros_antes_do_inicio": self.antes_do_inicio,
+            "parou_no_fim": self.parou_no_fim,
         }
 
 
@@ -169,11 +177,20 @@ def _decodificar(buf: bytes, enlace: int, cont: ReadCounters):
     return None
 
 
-def read_packets(path: str | Path, counters: ReadCounters | None = None) -> Iterator[Packet]:
+def read_packets(
+    path: str | Path,
+    counters: ReadCounters | None = None,
+    inicio: float | None = None,
+    fim: float | None = None,
+    avisar: bool = True,
+) -> Iterator[Packet]:
     """Itera os pacotes TCP do arquivo, na ordem em que aparecem.
 
     ``counters`` é preenchido durante a iteração. Ao final, se houver inversões de
     ordem de timestamp, um aviso é emitido (os pacotes não são reordenados).
+
+    Recorte no tempo (D73): quadros com ``ts < inicio`` são pulados (contados à parte) e a
+    leitura para no primeiro quadro com ``ts >= fim``.
     """
     cont = counters if counters is not None else ReadCounters()
     path = Path(path)
@@ -193,7 +210,7 @@ def read_packets(path: str | Path, counters: ReadCounters | None = None) -> Iter
                 + ", ".join(f"{n} ({v})" for v, n in ENLACES_SUPORTADOS.items())
             )
 
-        ts_anterior: float | None = None
+        cont.arquivos += 1
         iterador = iter(reader)
         while True:
             try:
@@ -206,11 +223,17 @@ def read_packets(path: str | Path, counters: ReadCounters | None = None) -> Iter
                 log.warning("%s: leitura interrompida em registro corrompido (%s)", path, exc)
                 break
 
-            cont.lidos += 1
             ts = float(ts)
-            if ts_anterior is not None and ts < ts_anterior:
+            if inicio is not None and ts < inicio:
+                cont.antes_do_inicio += 1
+                continue
+            if fim is not None and ts >= fim:
+                cont.parou_no_fim = True
+                break
+            cont.lidos += 1
+            if cont.ultimo_ts is not None and ts < cont.ultimo_ts:
                 cont.inversoes_ordem += 1
-            ts_anterior = ts
+            cont.ultimo_ts = ts
             if cont.primeiro_ts is None:
                 cont.primeiro_ts = ts
             if cont.max_ts is None or ts > cont.max_ts:
@@ -223,9 +246,70 @@ def read_packets(path: str | Path, counters: ReadCounters | None = None) -> Iter
             cont.tcp_aceitos += 1
             yield Packet(ts, src, int(tcp.sport), dst, int(tcp.dport), int(tcp.flags), len(tcp.data))
 
-    if cont.inversoes_ordem:
+    if avisar and cont.inversoes_ordem:
         log.warning(
             "%s: %d inversões de ordem de timestamp; pacotes processados na ordem do arquivo, sem reordenar",
             path,
             cont.inversoes_ordem,
         )
+
+
+def _ordem_natural(p: Path) -> tuple:
+    m = re.search(r"(\d+)$", p.name)
+    return (0, int(m.group(1)), p.name) if m else (1, 0, p.name)
+
+
+def arquivos_da_captura(caminho: str | Path) -> list[Path]:
+    """Arquivos de uma captura: o próprio arquivo ou, para uma pasta, os arquivos dela.
+
+    Numa pasta, a ordem é a do número no fim do nome (``x_0``, ``x_01``, ``x_02``, …,
+    ``x_010``), não a alfabética (D73). Arquivos ocultos são ignorados.
+    """
+    caminho = Path(caminho)
+    if caminho.is_dir():
+        arqs = sorted((p for p in caminho.iterdir() if p.is_file() and not p.name.startswith(".")), key=_ordem_natural)
+        if not arqs:
+            raise PcapError(f"pasta de captura vazia: {caminho}")
+        return arqs
+    if not caminho.is_file():
+        raise PcapError(f"arquivo de captura não encontrado: {caminho}")
+    return [caminho]
+
+
+def read_captura(
+    caminho: str | Path,
+    counters: ReadCounters | None = None,
+    inicio: float | None = None,
+    fim: float | None = None,
+) -> Iterator[Packet]:
+    """Pacotes TCP de uma captura (arquivo ou pasta de arquivos em sequência), como um fluxo só.
+
+    Inversões de timestamp são contadas também entre o fim de um arquivo e o início do
+    próximo. A leitura para no primeiro quadro com ``ts >= fim``.
+    """
+    cont = counters if counters is not None else ReadCounters()
+    for arq in arquivos_da_captura(caminho):
+        yield from read_packets(arq, cont, inicio, fim, avisar=False)
+        if cont.parou_no_fim:
+            break
+    if cont.inversoes_ordem:
+        log.warning(
+            "%s: %d inversões de ordem de timestamp; pacotes processados na ordem do arquivo, sem reordenar",
+            caminho,
+            cont.inversoes_ordem,
+        )
+
+
+def sha256_captura(caminho: str | Path) -> dict:
+    """SHA-256 de cada arquivo da captura e um resumo único (SHA-256 da lista nome:hash)."""
+    arqs = arquivos_da_captura(caminho)
+    por_arquivo = {a.name: sha256_arquivo(a) for a in arqs}
+    if len(arqs) == 1:
+        return {"sha256": next(iter(por_arquivo.values())), "arquivos": 1}
+    lista = "\n".join(f"{n}:{h}" for n, h in por_arquivo.items())
+    return {
+        "sha256": hashlib.sha256(lista.encode()).hexdigest(),
+        "arquivos": len(arqs),
+        "sha256_por_arquivo": por_arquivo,
+    }
+

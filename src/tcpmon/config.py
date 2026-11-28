@@ -13,6 +13,7 @@ import hashlib
 import ipaddress
 import json
 from dataclasses import dataclass
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -54,9 +55,11 @@ class AgregadorCfg:
 
 @dataclass(frozen=True)
 class EntradaCfg:
-    pcap: str | None
+    pcap: str | None  # arquivo ou pasta de arquivos em sequência (D73)
     rotulos: str | None
     metadado: str | None
+    inicio: float | None = None  # D73: recorte [inicio, fim) em segundos desde a época (UTC)
+    fim: float | None = None
 
 
 @dataclass(frozen=True)
@@ -158,6 +161,26 @@ def _num(
     return valor
 
 
+def _instante(valor: Any, nome: str) -> float | None:
+    """Instante absoluto: ISO 8601 com fuso (texto ou datetime do YAML) ou segundos desde a época."""
+    if valor is None:
+        return None
+    if isinstance(valor, bool):
+        raise ConfigError(f"'{nome}' inválido: {valor!r}")
+    if isinstance(valor, (int, float)):
+        return float(valor)
+    if isinstance(valor, str):
+        try:
+            valor = datetime.fromisoformat(valor)
+        except ValueError:
+            raise ConfigError(f"'{nome}' não é ISO 8601: {valor!r}") from None
+    if isinstance(valor, datetime):
+        if valor.tzinfo is None:
+            raise ConfigError(f"'{nome}' precisa de fuso explícito (ex.: 2018-11-03T09:42:00-03:00): {valor!r}")
+        return valor.timestamp()
+    raise ConfigError(f"'{nome}' inválido: {valor!r}")
+
+
 def _lista_texto(valor: Any, nome: str) -> tuple[str, ...]:
     if valor is None:
         return ()
@@ -232,10 +255,15 @@ def from_dict(raw: dict[str, Any], origem: str | None = None) -> Config:
     )
 
     ent = raw["entrada"] or {}
+    inicio, fim = _instante(ent.get("inicio"), "entrada.inicio"), _instante(ent.get("fim"), "entrada.fim")
+    if inicio is not None and fim is not None and fim <= inicio:
+        raise ConfigError(f"'entrada.fim' precisa ser posterior a 'entrada.inicio' ({ent.get('inicio')} .. {ent.get('fim')})")
     entrada = EntradaCfg(
         pcap=ent.get("pcap"),
         rotulos=ent.get("rotulos"),
         metadado=ent.get("metadado"),
+        inicio=inicio,
+        fim=fim,
     )
 
     av = raw["avaliacao"] or {}
@@ -257,6 +285,10 @@ def from_dict(raw: dict[str, Any], origem: str | None = None) -> Config:
 
     raw_norm = copy.deepcopy(raw)
     raw_norm["camadas"] = list(camadas)
+    for chave in ("inicio", "fim"):  # o YAML pode trazer datetime; guarda-se o texto ISO 8601
+        v = (raw_norm.get("entrada") or {}).get(chave)
+        if isinstance(v, (datetime, date)):
+            raw_norm["entrada"][chave] = v.isoformat()
 
     return Config(
         semente=int(semente),
