@@ -244,6 +244,14 @@ Antes de fixar a chave, verifica-se no pcap com que IP o atacante aparece (prova
 Até lá, as linhas afetadas da agenda têm `chave_valor = a_confirmar_nat`, que o conversor
 aponta como problema.
 
+**Verificação (2026-11-27) e decisão da equipe:** na sexta, os pacotes do atacante chegam
+ao servidor web vindos de 172.16.0.1 (161 773 pacotes no PortScan com firewall desligado;
+o DDoS LOIT, das três máquinas Win 8.1, também sai por esse IP). Na segunda-feira benigna,
+172.16.0.1 não envia nenhum pacote a 192.168.10.50 nem a 192.168.10.51; o tráfego externo
+que chega aos servidores é resposta a conexões abertas por eles (ACK, SYN-ACK). Chave dos
+ataques externos: `origem = 172.16.0.1`. Limitação: todos os atacantes externos
+compartilham esse IP.
+
 ### D64 — PortScan com firewall ligado fica fora da conta **[equipe]**
 2026-11-27 · fase 9 · decidida
 
@@ -260,14 +268,51 @@ features"), mas não o número de retransmissões do SYN-ACK no servidor. Sem fo
 análise de sensibilidade com o Windows sai da D39. Os servidores monitorados pelo agregador
 nos dois datasets são Ubuntu (Linux), e para eles τ_hs = 63 s (D39).
 
+### D68 — Varreduras sem pacotes na captura ficam fora da conta **[equipe]**
+2026-11-27 · fase 9 · decidida · revê parte da D62
+
+Na sexta, as varreduras `sF`, `sX`, `sN`, `sA` e `sW` (firewall desligado) não deixaram
+pacotes na captura interna. Não há um único pacote Xmas, NULL ou com FIN isolado no dia
+inteiro, para nenhum destino. Nas janelas desses ataques, o atacante (172.16.0.1) não envia
+nada ao servidor, exceto 8 pacotes às 15:03, na janela do `sN` (4 ACK, 2 SYN, 2 outros),
+nenhum NULL. As varreduras que aparecem são de SYN: `sS` (cerca de 59 mil SYN), `sT`
+(cerca de 81 mil), `sV` (cerca de 11 mil) e `sR` (cerca de 9 mil). Decisão: os episódios
+`portscan_sF`, `portscan_sX`, `portscan_sN`, `portscan_sA` e `portscan_sW` ficam fora da conta,
+como o firewall ligado. As classes estruturais (`xmas`, `null`, `ack_sem_syn`) são avaliadas
+só no laboratório, e o artigo diz que o CIC-IDS2017 não as contém na captura.
+
+Também sem pacotes TCP nas janelas, mas mantidos como positivos com classe própria (D62):
+`sP`, `sU`, `sO`, `sL`, `sI` e `b`. Três deles não usam TCP (`sU`, `sO`) ou não mandam
+pacotes ao alvo (`sL`). Fica para a equipe decidir se também saem da conta.
+
+Janelas com firewall ligado (D64): o atacante envia algumas centenas de pacotes ao
+servidor (13:55–14:00 e 14:14–14:16; 344 SYN, 270 ACK, 190 RST e 53 outros no total).
+
+### D69 — CIC-DDoS2019: o pacote baixado é o "Second Day" **[equipe]**
+2026-11-27 · fase 9 · decidida
+
+`PCAP-01-12_0-0249.zip` (250 arquivos `SAT-01-12-2018_N` de 200 MB, 47 GB) começa às 13:17:10 UTC
+de 1º/12/2018 (9:17 em AST, UTC−4, o fuso de dezembro em New Brunswick). O tráfego dispara às
+10:36 AST, como o NTP do "Second Day" (10:35–10:45), e o último arquivo começa às 11:08:55. O
+SYN Flood desse dia (13:29–13:34) está em arquivos que não vieram. Decisão: baixar o "First Day"
+(SYN Flood 11:28–17:35), como previa a D60. O pacote 01-12 fica guardado; tem 78 min benignos
+antes do primeiro ataque.
+
+Também nos pcaps:
+- CIC-IDS2017: os cinco dias vêm em pcapng (extensão `.pcap`), Ethernet, e conferem com os MD5
+  publicados. Os primeiros pacotes ficam entre 11:42 e 11:59 UTC, ou seja, entre 8:42 e 8:59 em
+  UTC−3, compatível com "started at 9 a.m.". **O fuso UTC−3 da D38 está confirmado.**
+- Os arquivos estão em `data/pcaps/` e não em `data/cicids2017/` e `data/cicddos2019/` (D60).
+- Numeração dos arquivos do CIC-DDoS2019: `_0`, `_01`, … `_0249`; a ordem numérica não é a
+  alfabética.
+
 ### Pendências que continuam com a equipe
 
-- Preencher o formulário de download e trazer os pcaps da D60.
-- Conferir os fatos da D59 e os rascunhos de agenda em `configs/rotulos/` (classes, chaves e
-  horários transcritos).
-- Depois dos pcaps: fuso (D59), chave dos ataques externos (D63), datas, início da captura e
-  alvo no CIC-DDoS2019 (D59, D61), e `agregador.servidores` dos dois datasets (proposta:
-  192.168.10.50 e 192.168.10.51 no CIC-IDS2017; 192.168.50.1 no primeiro dia do CIC-DDoS2019).
+- Baixar o "First Day" do CIC-DDoS2019 (D69).
+- Conferir a transcrição das agendas em `configs/rotulos/` (D67).
+- Confirmar `agregador.servidores`: 192.168.10.50 e 192.168.10.51 no CIC-IDS2017 (em
+  `configs/experiments/cicids2017.yaml`); no CIC-DDoS2019, conferir no pcap do "First Day".
+- Decidir se `sP`, `sU`, `sO`, `sL`, `sI` e `b` também saem da conta (D68).
 
 ---
 
@@ -813,3 +858,40 @@ dá, e a URL da fonte. Escolhas de transcrição:
   e poderia ser `ack_sem_syn`; ficou como classe própria até a equipe decidir.
 - CIC-DDoS2019, primeiro dia: data, fuso e alvo ficam `a_confirmar` (D59); o conversor recusa
   o arquivo até que sejam preenchidos.
+
+### D70 — Experimento do CIC-IDS2017 com um comando
+2026-11-27 · fase 9 · aberta
+
+`configs/experiments/cicids2017.yaml`: calibração na segunda, teste na sexta. Para datasets
+reais, `experiments/run.py` confere se os pcaps existem e converte a agenda em rótulos
+(`tcpmon agenda --dias 2017-07-07 --estrito`). Se a agenda tiver qualquer problema, o
+experimento para: rótulos com problema não entram em execução sem a equipe ver. A agenda
+cobre a semana; `--dias` seleciona pela coluna `data`, e só os episódios de sexta entram nos
+rótulos do teste. Carência G = 120 s (D40, valor de `default.yaml`), τ_hs = 63 s com origem
+`documentacao_dataset` (D39), tolerância de 60 s com sensibilidade em 0 e 300 s (D38).
+
+### D71 — Inclusão por traço com instâncias de mesmo início (correção)
+2026-11-27 · fase 9 · aberta · corrige a implementação da D33
+
+Na primeira execução sobre o CIC-IDS2017, a verificação C1 ⊆ C2 por traço apontou 209
+violações. Todas eram da verificação, não do monitor. Uma mesma chave pode ter duas instâncias
+com o mesmo instante de início (D72): a primeira é rejeitada na hora nas duas configurações, e
+a segunda só na C2, 63 s depois. A verificação indexava as instâncias da C2 por
+(chave, início) num dicionário, e a segunda sobrescrevia a primeira. Agora, para cada
+instância rejeitada na C1, basta que **alguma** instância da C2 com a mesma chave e o mesmo
+início seja rejeitada até o mesmo instante; na violação, reporta-se a mais cedo. O critério
+da D33 não muda. Teste: `test_inclusao_por_traco_com_mesmo_inicio`.
+
+### D72 — Resposta do servidor gravada antes do SYN, com o mesmo timestamp
+2026-11-27 · fase 9 · aberta · observação sobre o dado, nada corrigido
+
+Na sexta do CIC-IDS2017, 210 chaves têm a resposta do servidor (RST em 169, SYN-ACK em 40)
+gravada **antes** do SYN que a provocou, com o mesmo timestamp ao microssegundo; 208 delas
+são do scanner (172.16.0.1). Pela regra de leitura (ordem do arquivo, sem reordenar), a
+primeira instância começa pela resposta e vai para ⊥ (`SEM_HANDSHAKE`, `SYNACK_SEM_SYN` ou
+`TRANSICAO_INESPERADA`), e o SYN abre outra instância no mesmo instante. Na C1 ela fica em
+`SYN_VISTO` até a inatividade, e na C2 expira em τ_hs (`HANDSHAKE_EXPIRADO`). Esses alertas
+caem nas janelas do PortScan e contam para a P_D dele. O pcap não é alterado (regra 7) e a
+ordem não é corrigida (guia: processar na ordem do arquivo). O efeito vai para o artigo como
+artefato da captura.
+

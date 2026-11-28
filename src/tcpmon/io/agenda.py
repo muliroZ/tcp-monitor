@@ -77,8 +77,12 @@ def epoch(dia: date, hora: time, tz: tzinfo) -> float:
     return datetime.combine(dia, hora, tzinfo=tz).timestamp()
 
 
-def converter(caminho: str | Path) -> tuple[list[Episodio], list[str]]:
-    """Lê a agenda e devolve os episódios e os problemas encontrados."""
+def converter(caminho: str | Path, dias: list[str] | None = None) -> tuple[list[Episodio], list[str]]:
+    """Lê a agenda e devolve os episódios e os problemas encontrados.
+
+    ``dias`` (``AAAA-MM-DD``, data local da agenda) restringe a saída aos episódios desses dias,
+    por exemplo o dia do pcap de teste. A seleção é pela coluna ``data``, sem olhar horários.
+    """
     caminho = Path(caminho)
     with caminho.open(newline="", encoding="utf-8") as fh:
         r = csv.DictReader(fh)
@@ -88,6 +92,8 @@ def converter(caminho: str | Path) -> tuple[list[Episodio], list[str]]:
         extras = [c for c in r.fieldnames if c not in COLUNAS_AGENDA]
         episodios = []
         for n, linha in enumerate(r, start=2):  # linha 1 é o cabeçalho
+            if dias is not None and linha["data"].strip() not in dias:
+                continue
             tz = fuso(linha["fuso"])
             dia = _data(linha["data"], n)
             h_ini, h_fim = _hora(linha["inicio"], "inicio", n), _hora(linha["fim"], "fim", n)
@@ -124,8 +130,10 @@ def converter(caminho: str | Path) -> tuple[list[Episodio], list[str]]:
     return episodios, problemas
 
 
-def agenda_para_rotulos(entrada: str | Path, saida: str | Path) -> list[str]:
+def agenda_para_rotulos(entrada: str | Path, saida: str | Path, dias: list[str] | None = None) -> list[str]:
     """Converte a agenda em ``labels.csv`` e devolve os problemas encontrados (não corrigidos)."""
-    episodios, problemas = converter(entrada)
+    episodios, problemas = converter(entrada, dias)
+    if dias is not None and not episodios:
+        problemas.append(f"nenhum episódio nos dias {dias}")
     write_labels(saida, episodios)
     return problemas
