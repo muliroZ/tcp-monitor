@@ -29,6 +29,8 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/).
   para datasets reais; `tcpmon agenda --dias` e `--estrito`.
 
 ### Alterado
+- D75: primeiros resultados no CIC-IDS2017 (segunda → sexta) e no CIC-DDoS2019 (3/11/2018), com
+  o pipeline completo; observações e perguntas abertas.
 - Menos memória por fluxo no motor (strings de IP internadas, tuplas reaproveitadas); saídas
   idênticas.
 - D74: verificações no "First Day" do CIC-DDoS2019 (data, fuso, alvo 192.168.50.4), decididas pela

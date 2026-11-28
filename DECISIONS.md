@@ -936,3 +936,37 @@ artefato da captura.
   a C1 chegou a 2 milhões de fluxos vivos e 3,75 GB, porque cada conexão pendente fica até a
   inatividade (3 600 s; D20).
 
+### D75 — Primeiros resultados nos datasets reais: observações
+2026-11-27 · fase 9 · aberta · nada foi ajustado; duas perguntas para a equipe
+
+Execuções: `results/cicids2017/` (commit 161abce) e `results/cicddos2019/` (commit e71ef13), cada uma
+com um comando (`experiments/run.py --config …`). Sem violação de inclusão C1 ⊆ C2 ⊆ C3 nos dois.
+
+- **k = 0 nos dois datasets.** Numa rede local o handshake termina em milissegundos, e o retrato no
+  fim da janela quase nunca tem um pendente: â = 0,0043 (192.168.10.50, segunda-feira) e 0,0081
+  (192.168.50.4). A P_FA do agregador no teste confere com a teoria: 0,0069 [0,0043; 0,0112] contra
+  `poisson.sf(0, â)` = 0,0080 no CIC-DDoS2019. A lei de Little confere nos dois (0,00432 × 0,00434;
+  0,0091 × 0,0081). 192.168.10.51 não recebe nenhuma conexão na segunda (λ̂_L = 0).
+- **CIC-IDS2017, falsos alarmes da C1** (442 janelas benignas de 19 421): quase todos
+  `TRANSICAO_INESPERADA`, sobretudo `SYN_VISTO` + `C.ACK` (o SYN-ACK não está na captura) e
+  `FECHADO` + `S.SYNACK` (SYN-ACK retransmitido depois do fecho). São pacotes ausentes ou
+  retransmissões na captura, não ataque; o autômato da camada 1 não tolera perda de pacote.
+- **CIC-DDoS2019, SYN Flood:** o episódio oficial vai de 11:28 a 17:35, mas o ataque na captura
+  dura cerca de 9 min (450 456 SYN entre 11:30 e 11:39; antes disso, desde 11:28). De 11:40 em
+  diante chegam ao alvo cerca de 100 SYN a cada 10 min, no nível do tráfego benigno. Nas janelas
+  do ataque efetivo a detecção da C2 e da C3 é quase total; na média do episódio, P_D = 0,022 (C2)
+  e 0,068 (C3). Os ataques UDP (PortMap, NetBIOS, LDAP, MSSQL, UDP, UDP-Lag) não são TCP e ficam
+  com P_D ≈ 0, como esperado.
+- **Validação analítica do SYN Flood nos dados reais:** não foi feita. O código só trata episódios
+  com λ_A do gerador (`parametros.lambda_A`), que existe só no laboratório.
+- Desempenho: segunda-feira do CIC-IDS2017 (11,7 milhões de pacotes) em 3 min 47 s; sexta (10
+  milhões) em cerca de 3 min por configuração. CIC-DDoS2019 (61 milhões de pacotes TCP e não TCP)
+  em 11–12 min por configuração, com pico de 2,9 milhões de fluxos e 4,2 GB na C1, e 6,4 GB na C2
+  (2,67 milhões de alertas em memória).
+
+**Para a equipe:**
+1. SYN Flood do CIC-DDoS2019: manter o episódio de 11:28 a 17:35 como está (P_D média baixa,
+   explicada no artigo) ou também reportar, à parte, as janelas em que o ataque aparece na captura?
+2. Validação analítica no CIC-DDoS2019: estimar λ̂_A pela captura (SYNs do atacante ao alvo) e
+   comparar com o modelo, ou deixar a validação analítica só para o laboratório?
+

@@ -29,7 +29,7 @@ as curvas teóricas do modelo M/G/∞.
 | 6 | Camada 3 — Agregador e calibração | ✅ |
 | 7 | Avaliação | ✅ |
 | 8 | Validação analítica | ✅ |
-| 9 | CIC-IDS2017 e CIC-DDoS2019 (D37) | bloqueada: aguardando a equipe (servidores e pcaps) |
+| 9 | CIC-IDS2017 e CIC-DDoS2019 (D37) | pipeline completo roda sobre um dia de cada (D75) |
 | 10 | Baselines Zeek e Suricata (D41) | depois da fase 9 |
 
 Limitações reportadas no artigo (decididas pela equipe):
