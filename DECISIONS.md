@@ -870,3 +870,28 @@ cobre a semana; `--dias` seleciona pela coluna `data`, e só os episódios de se
 rótulos do teste. Carência G = 120 s (D40, valor de `default.yaml`), τ_hs = 63 s com origem
 `documentacao_dataset` (D39), tolerância de 60 s com sensibilidade em 0 e 300 s (D38).
 
+### D71 — Inclusão por traço com instâncias de mesmo início (correção)
+2026-11-27 · fase 9 · aberta · corrige a implementação da D33
+
+Na primeira execução sobre o CIC-IDS2017, a verificação C1 ⊆ C2 por traço apontou 209
+violações. Todas eram da verificação, não do monitor. Uma mesma chave pode ter duas instâncias
+com o mesmo instante de início (D72): a primeira é rejeitada na hora nas duas configurações, e
+a segunda só na C2, 63 s depois. A verificação indexava as instâncias da C2 por
+(chave, início) num dicionário, e a segunda sobrescrevia a primeira. Agora, para cada
+instância rejeitada na C1, basta que **alguma** instância da C2 com a mesma chave e o mesmo
+início seja rejeitada até o mesmo instante; na violação, reporta-se a mais cedo. O critério
+da D33 não muda. Teste: `test_inclusao_por_traco_com_mesmo_inicio`.
+
+### D72 — Resposta do servidor gravada antes do SYN, com o mesmo timestamp
+2026-11-27 · fase 9 · aberta · observação sobre o dado, nada corrigido
+
+Na sexta do CIC-IDS2017, 210 chaves têm a resposta do servidor (RST em 169, SYN-ACK em 40)
+gravada **antes** do SYN que a provocou, com o mesmo timestamp ao microssegundo; 208 delas
+são do scanner (172.16.0.1). Pela regra de leitura (ordem do arquivo, sem reordenar), a
+primeira instância começa pela resposta e vai para ⊥ (`SEM_HANDSHAKE`, `SYNACK_SEM_SYN` ou
+`TRANSICAO_INESPERADA`), e o SYN abre outra instância no mesmo instante. Na C1 ela fica em
+`SYN_VISTO` até a inatividade, e na C2 expira em τ_hs (`HANDSHAKE_EXPIRADO`). Esses alertas
+caem nas janelas do PortScan e contam para a P_D dele. O pcap não é alterado (regra 7) e a
+ordem não é corrigida (guia: processar na ordem do arquivo). O efeito vai para o artigo como
+artefato da captura.
+

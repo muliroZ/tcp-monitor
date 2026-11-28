@@ -5,6 +5,10 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+### Corrigido
+- D71: a verificação C1 ⊆ C2 por traço considera todas as instâncias da C2 com a mesma chave e
+  o mesmo início (antes, uma sobrescrevia a outra e apareciam violações falsas).
+
 ### Adicionado
 - D38 (D56): tolerância de rótulo na avaliação e na validação analítica
   (`avaliacao.tolerancia_rotulo_s`), `tcpmon eval --tolerancia` e análise de sensibilidade em
