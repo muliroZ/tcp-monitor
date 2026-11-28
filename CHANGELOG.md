@@ -3,6 +3,55 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/);
 versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.6.0] — 2026-11-28
+
+Fase 9: CIC-IDS2017 e CIC-DDoS2019.
+
+### Corrigido
+- D76: a rajada do recorte pode começar depois do início do episódio.
+- D71: a verificação C1 ⊆ C2 por traço considera todas as instâncias da C2 com a mesma chave e
+  o mesmo início (antes, uma sobrescrevia a outra e apareciam violações falsas).
+
+### Adicionado
+- D76: `tcpmon recorte` (rajada do episódio, rótulos à parte), validação analítica com λ̂_A
+  estimado nos datasets reais (`avaliacao.classes_syn_flood`), `tcpmon analytic --rotulos --saida`.
+- D73: captura em vários arquivos (pasta lida em ordem numérica) e recorte no tempo
+  (`entrada.inicio`, `entrada.fim`, `--inicio`, `--fim`); `configs/experiments/cicddos2019.yaml`.
+- D38 (D56): tolerância de rótulo na avaliação e na validação analítica
+  (`avaliacao.tolerancia_rotulo_s`), `tcpmon eval --tolerancia` e análise de sensibilidade em
+  `experiments/run.py` (`avaliacao.sensibilidade_tolerancia_s`).
+- D38 (D58): `tcpmon agenda` converte a agenda oficial transcrita (horário local) em
+  `labels.csv` (UTC), sem ajustar nada e reportando problemas.
+- D39 (D57): `tau_hs_origem` na configuração, gravada em `run.json` quando τ_hs não vem do
+  metadado do laboratório.
+
+- D64 (D66): `avaliacao.classes_fora_da_conta`, para episódios cujas janelas não são
+  positivas nem benignas.
+- D59 (D67): rascunhos das agendas do CIC-IDS2017 e do primeiro dia do CIC-DDoS2019 em
+  `configs/rotulos/`, transcritos das páginas oficiais, para a equipe conferir.
+
+- D70: `configs/experiments/cicids2017.yaml` e, em `experiments/run.py`, conversão da agenda
+  para datasets reais; `tcpmon agenda --dias` e `--estrito`.
+
+### Alterado
+- D75: primeiros resultados no CIC-IDS2017 (segunda → sexta) e no CIC-DDoS2019 (3/11/2018), com
+  o pipeline completo; observações e perguntas abertas.
+- Menos memória por fluxo no motor (strings de IP internadas, tuplas reaproveitadas); saídas
+  idênticas.
+- D74: verificações no "First Day" do CIC-DDoS2019 (data, fuso, alvo 192.168.50.4), decididas pela
+  equipe.
+- D63 resolvida (atacante externo como 172.16.0.1); D68 (varreduras sem pacotes na captura fora
+  da conta) e D69 (o pacote baixado do CIC-DDoS2019 é o "Second Day"), decididas pela equipe.
+- D58, D60–D65 decididas pela equipe (levantamento das páginas oficiais, download, calibração do
+  CIC-DDoS2019, rotulagem de todos os ataques, chave do NAT, PortScan com firewall ligado e
+  retirada da sensibilidade com o Windows Server).
+- O bloco `avaliacao` passa a ser obrigatório na configuração (já está em `default.yaml`).
+- D52 decidida pela equipe: os dados do laboratório ficam como estão e a reordenação do
+  `netem` é reportada como limitação do artigo.
+- D53 e D55 decididas pela equipe: mantidas como estão.
+- D54 decidida pela equipe: a dependência entre janelas é reportada como limitação; os
+  intervalos de Wilson e o McNemar continuam como o guia pede.
+
 ## [0.5.0] — 2026-11-26
 
 Fases 7 (avaliação) e 8 (validação analítica).
@@ -44,8 +93,7 @@ Fases 7 (avaliação) e 8 (validação analítica).
   taxa realizada em cada episódio (λ̂_A).
 - D52: resultado do diagnóstico. O `netem` com jitter reordena o ACK puro e o segmento de dados
   seguinte em cerca de 50% das conexões, com ou sem fila filha. Por isso T ≈ 39 ms (o mínimo
-  de dois atrasos), e não 50 ms. A verificação da D13 não se sustenta. Fica pendente com a
-  equipe.
+  de dois atrasos), e não 50 ms. A verificação da D13 não se sustenta.
 
 ## [0.4.0] — 2026-11-25
 

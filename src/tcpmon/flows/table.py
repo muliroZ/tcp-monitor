@@ -8,7 +8,7 @@ Esta é a parte da base compartilhada que transforma pacotes normalizados em
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from tcpmon.flows.key import Endpoint, FlowKey, direction, flow_key, format_endpoint
 from tcpmon.io.pcap_reader import Packet
@@ -37,7 +37,6 @@ class FlowInstance:
     motivo_alerta: str | None = None
     vivo: bool = True
     ocioso_em: float | None = None  # instante agendado da próxima verificação de inatividade
-    extra: dict = field(default_factory=dict)
 
     @property
     def id(self) -> str:
@@ -81,11 +80,13 @@ class FlowTable:
         """Cria uma instância nova cujo cliente é o remetente de ``pkt``."""
         n = self._proxima_instancia.get(key, 0)
         self._proxima_instancia[key] = n + 1
+        # Reaproveita as tuplas da chave (menos memória por fluxo; mesmo conteúdo).
+        cliente, servidor = (key.menor, key.maior) if key.menor == pkt.src else (key.maior, key.menor)
         fluxo = FlowInstance(
             key=key,
             instancia=n,
-            cliente=pkt.src,
-            servidor=pkt.dst,
+            cliente=cliente,
+            servidor=servidor,
             inicio=pkt.ts,
             ultimo=pkt.ts,
         )

@@ -173,15 +173,167 @@ demais dias são teste. Nada medido no teste volta para a escolha de parâmetros
 - A conversão (`conn_state` do Zeek, como S0, REJ e SH, e as assinaturas do Suricata para as
   classes de anomalia) é registrada aqui, item por item, antes da execução.
 
+### D59 — Levantamento nas páginas oficiais (D37) **[equipe]**
+2026-11-27 · fase 9 · decidida · os fatos foram levantados pelo projeto e são conferidos pela equipe
+
+Fontes: <https://www.unb.ca/cic/datasets/ids-2017.html> e
+<https://www.unb.ca/cic/datasets/ddos-2019.html> (lidas em 2026-11-27).
+
+**CIC-IDS2017** (confirmado na página):
+- Captura de 9h de segunda, 3/7/2017, até 17h de sexta, 7/7/2017; "Monday is the normal day
+  and only includes the benign traffic" (confirma a D40).
+- Ataques e horários por dia, transcritos em `configs/rotulos/cicids2017_agenda.csv`.
+- Rede das vítimas: Web server 16 (192.168.10.50), Ubuntu server 12 (192.168.10.51), quatro
+  Ubuntu clientes, Win 7, Win 8.1, Win Vista, dois Win 10 e um MAC; DNS/DC 192.168.10.3;
+  firewall 205.174.165.80 / 172.16.0.1. Atacantes: Kali 205.174.165.73 e três Win 8.1
+  (205.174.165.69–71).
+- NAT: o tráfego do atacante segue "205.174.165.73 -> 205.174.165.80 -> 172.16.0.1 ->
+  192.168.10.50"; a página não diz com que IP o atacante aparece na captura interna.
+- Não há SYN Flood: os DoS são de aplicação (slowloris, Slowhttptest, Hulk, GoldenEye) e o DDoS
+  é "LOIT" (confirma a D37). O PortScan de sexta é vertical (um alvo) e usa vários tipos de
+  varredura do nmap.
+- Tamanhos: segunda 11,0 GB; terça 11 GB; quarta 13 GB; quinta 7,8 GB; sexta 8,3 GB.
+
+**CIC-DDoS2019** (confirmado na página):
+- "First Day": PortMap 9:43–9:51, NetBIOS 10:00–10:09, LDAP 10:21–10:30, MSSQL 10:33–10:42,
+  UDP 10:53–11:03, UDP-Lag 11:14–11:24, **SYN 11:28–17:35**. "Second Day": 12 ataques; SYN
+  13:29–13:34. O texto chama um dia de treino e outro de teste, mas a tabela não liga os rótulos
+  "First Day" e "Second Day" a treino e teste.
+- Servidor Ubuntu 16.04: 192.168.50.1 no primeiro dia e 192.168.50.4 no segundo. PCs Windows:
+  192.168.50.5–8 no primeiro dia; 192.168.50.6–9 no segundo. Firewall Fortinet 205.174.165.81.
+
+**Não está nas páginas, e fica para conferir no pcap:**
+- Fuso dos horários, nos dois datasets. A D38 supôs UTC−3 (ADT); confere-se pelo primeiro
+  pacote da segunda-feira (captura iniciada às 9h).
+- Com que IP o atacante aparece na captura interna do CIC-IDS2017 (D63).
+- Datas dos dias do CIC-DDoS2019, início de cada captura e alvo de cada ataque (o servidor é a
+  única máquina listada, mas a página não diz que é o alvo do SYN Flood).
+- Endereços dos atacantes do CIC-DDoS2019.
+
+### D60 — Download só do necessário **[equipe]**
+2026-11-27 · fase 9 · decidida
+
+Primeiro: segunda-feira (calibração) e sexta-feira (proposta: PortScan com Xmas, NULL e ACK,
+mais o DDoS LOIT) do CIC-IDS2017, e o primeiro dia do CIC-DDoS2019 (SYN Flood de 6 h). Os
+demais dias vêm depois. O download exige um formulário com dados pessoais (nome, e-mail,
+instituição, cargo e país), que a equipe preenche; os arquivos ou o link vão para
+`data/cicids2017/` e `data/cicddos2019/`, e o projeto registra os SHA-256.
+
+### D61 — Calibração do CIC-DDoS2019 no trecho benigno do próprio dia **[equipe]**
+2026-11-27 · fase 9 · decidida
+
+A calibração usa o intervalo do mesmo dia antes do primeiro ataque da agenda (no primeiro dia,
+antes de 9:43); o resto do dia é teste. Vale se o trecho for longo o bastante para estimar k:
+no laboratório, 15 min deram 903 retratos com W = 1 s. O início da captura não está na página
+e será lido no pcap; se o trecho for curto, a questão volta à equipe antes de qualquer execução.
+
+### D62 — Todos os ataques do CIC-IDS2017 são rotulados **[equipe]**
+2026-11-27 · fase 9 · decidida
+
+Todo ataque da agenda vira episódio, para que nenhuma janela de ataque seja contada como
+benigna. Os que têm classe correspondente no monitor usam essa classe: nmap `sX` → `xmas`,
+`sN` → `null`, `sA` → `ack_sem_syn`. Os demais usam o nome oficial como classe própria (por
+exemplo `dos_slowloris`, `portscan_sS`) e têm P_D reportada como está. Isso também serve à
+comparação de cobertura com Zeek e Suricata (D41).
+
+### D63 — Chave dos ataques externos do CIC-IDS2017: conferir no pcap **[equipe]**
+2026-11-27 · fase 9 · decidida · aguardando os pcaps
+
+Antes de fixar a chave, verifica-se no pcap com que IP o atacante aparece (provavelmente
+172.16.0.1) e se esse IP também carrega tráfego benigno de fora. Os números voltam à equipe.
+Até lá, as linhas afetadas da agenda têm `chave_valor = a_confirmar_nat`, que o conversor
+aponta como problema.
+
+**Verificação (2026-11-27) e decisão da equipe:** na sexta, os pacotes do atacante chegam
+ao servidor web vindos de 172.16.0.1 (161 773 pacotes no PortScan com firewall desligado;
+o DDoS LOIT, das três máquinas Win 8.1, também sai por esse IP). Na segunda-feira benigna,
+172.16.0.1 não envia nenhum pacote a 192.168.10.50 nem a 192.168.10.51; o tráfego externo
+que chega aos servidores é resposta a conexões abertas por eles (ACK, SYN-ACK). Chave dos
+ataques externos: `origem = 172.16.0.1`. Limitação: todos os atacantes externos
+compartilham esse IP.
+
+### D64 — PortScan com firewall ligado fica fora da conta **[equipe]**
+2026-11-27 · fase 9 · decidida
+
+As 12 janelas do PortScan com "Firewall Rule on" (sexta, 13:55–14:35) não são positivas nem
+benignas, e os alertas delas são reportados à parte. A contagem de pacotes do atacante nessas
+janelas é registrada quando os pcaps chegarem. Classe na agenda: `portscan_firewall_ligado`,
+listada em `avaliacao.classes_fora_da_conta`.
+
+### D65 — Sem sensibilidade de τ_hs com o Windows Server **[equipe]**
+2026-11-27 · fase 9 · decidida · revê parte da D39
+
+A Microsoft documenta o RTO inicial (3 s; `MSFT_NetTCPSetting`, "Description of Windows TCP
+features"), mas não o número de retransmissões do SYN-ACK no servidor. Sem fonte oficial, a
+análise de sensibilidade com o Windows sai da D39. Os servidores monitorados pelo agregador
+nos dois datasets são Ubuntu (Linux), e para eles τ_hs = 63 s (D39).
+
+### D68 — Varreduras sem pacotes na captura ficam fora da conta **[equipe]**
+2026-11-27 · fase 9 · decidida · revê parte da D62
+
+Na sexta, as varreduras `sF`, `sX`, `sN`, `sA` e `sW` (firewall desligado) não deixaram
+pacotes na captura interna. Não há um único pacote Xmas, NULL ou com FIN isolado no dia
+inteiro, para nenhum destino. Nas janelas desses ataques, o atacante (172.16.0.1) não envia
+nada ao servidor, exceto 8 pacotes às 15:03, na janela do `sN` (4 ACK, 2 SYN, 2 outros),
+nenhum NULL. As varreduras que aparecem são de SYN: `sS` (cerca de 59 mil SYN), `sT`
+(cerca de 81 mil), `sV` (cerca de 11 mil) e `sR` (cerca de 9 mil). Decisão: os episódios
+`portscan_sF`, `portscan_sX`, `portscan_sN`, `portscan_sA` e `portscan_sW` ficam fora da conta,
+como o firewall ligado. As classes estruturais (`xmas`, `null`, `ack_sem_syn`) são avaliadas
+só no laboratório, e o artigo diz que o CIC-IDS2017 não as contém na captura.
+
+Também sem pacotes TCP nas janelas, mas mantidos como positivos com classe própria (D62):
+`sP`, `sU`, `sO`, `sL`, `sI` e `b`. Três deles não usam TCP (`sU`, `sO`) ou não mandam
+pacotes ao alvo (`sL`). Fica para a equipe decidir se também saem da conta.
+
+Janelas com firewall ligado (D64): o atacante envia algumas centenas de pacotes ao
+servidor (13:55–14:00 e 14:14–14:16; 344 SYN, 270 ACK, 190 RST e 53 outros no total).
+
+### D69 — CIC-DDoS2019: o pacote baixado é o "Second Day" **[equipe]**
+2026-11-27 · fase 9 · decidida
+
+`PCAP-01-12_0-0249.zip` (250 arquivos `SAT-01-12-2018_N` de 200 MB, 47 GB) começa às 13:17:10 UTC
+de 1º/12/2018 (9:17 em AST, UTC−4, o fuso de dezembro em New Brunswick). O tráfego dispara às
+10:36 AST, como o NTP do "Second Day" (10:35–10:45), e o último arquivo começa às 11:08:55. O
+SYN Flood desse dia (13:29–13:34) está em arquivos que não vieram. Decisão: baixar o "First Day"
+(SYN Flood 11:28–17:35), como previa a D60. O pacote 01-12 fica guardado; tem 78 min benignos
+antes do primeiro ataque.
+
+Também nos pcaps:
+- CIC-IDS2017: os cinco dias vêm em pcapng (extensão `.pcap`), Ethernet, e conferem com os MD5
+  publicados. Os primeiros pacotes ficam entre 11:42 e 11:59 UTC, ou seja, entre 8:42 e 8:59 em
+  UTC−3, compatível com "started at 9 a.m.". **O fuso UTC−3 da D38 está confirmado.**
+- Os arquivos estão em `data/pcaps/` e não em `data/cicids2017/` e `data/cicddos2019/` (D60).
+- Numeração dos arquivos do CIC-DDoS2019: `_0`, `_01`, … `_0249`; a ordem numérica não é a
+  alfabética.
+
+### D74 — CIC-DDoS2019, "First Day": verificações no pcap **[equipe]**
+2026-11-27 · fase 9 · decidida · servidores confirmados pela equipe
+
+`PCAP-03-11.zip`: 146 arquivos `SAT-03-11-2018_N` (29 GB extraídos; nomes e tamanhos conferidos
+com a lista do zip, sem MD5 publicado). Achados:
+- Data: 3/11/2018. Fuso: UTC−3 (ADT; o horário de verão em New Brunswick terminou em 4/11/2018).
+  A captura vai de 9:18:16 a 17:36:41. O início de cada fase de ataque bate com a agenda: NetBIOS
+  10:01, LDAP 10:21, MSSQL 10:34, UDP 10:54, UDP-Lag 11:14, SYN 11:28–11:30.
+- Alvo de todos os ataques na captura: **192.168.50.4**, vindos de **172.16.0.5**. A página lista o
+  servidor deste dia como 192.168.50.1, mas esse IP não aparece no tráfego; `agregador.servidores
+  = [192.168.50.4]`.
+- 172.16.0.5 é também a origem do tráfego benigno que chega ao servidor (886 SYN entre 9:18 e
+  10:01): o NAT mistura clientes benignos e atacante. A chave dos ataques é o servidor, então isso
+  não afeta o casamento dos alertas.
+- PortMap (9:43–9:51): sem tráfego de ataque visível para o alvo. Fica rotulado com classe
+  própria, como os demais (D62); é UDP, e o monitor só vê TCP.
+- SYN Flood: denso entre 11:28 e cerca de 11:36 (cerca de 25 mil SYN/s e 8 mil conexões novas por
+  segundo); depois disso, os arquivos `_0144` e `_0145` cobrem de 12:37 a 17:36 com pouco tráfego.
+- Calibração (D61): de 9:18:16 até 9:42:00, 60 s antes do primeiro ataque (tolerância da D38),
+  cerca de 24 min. Teste: de 9:42:00 até o fim da captura.
+
 ### Pendências que continuam com a equipe
 
-- Conferir na página da UNB os fatos listados na D37 e preencher `agregador.servidores`.
-- Baixar os pcaps do CIC-IDS2017 (segunda-feira e dias de ataque) e do dia de SYN Flood do
-  CIC-DDoS2019. A equipe ainda não os tem.
-- Definir a calibração do CIC-DDoS2019 (D37).
-- D52: a fila `pfifo` da D13 não impede a reordenação do `netem` neste kernel. Decidir se os
-  dados do laboratório ficam como estão (T efetivo ≈ 39 ms, reordenação reportada como
-  limitação) ou se o aparato muda e as capturas são refeitas.
+- Baixar o "First Day" do CIC-DDoS2019 (D69).
+- Conferir a transcrição das agendas em `configs/rotulos/` (D67).
+- Confirmar `agregador.servidores`: 192.168.10.50 e 192.168.10.51 no CIC-IDS2017 (em
+  `configs/experiments/cicids2017.yaml`); no CIC-DDoS2019, conferir no pcap do "First Day".
+- Decidir se `sP`, `sU`, `sO`, `sL`, `sI` e `b` também saem da conta (D68).
 
 ---
 
@@ -268,7 +420,8 @@ latência, não reordenação; reordenação é uma limitação discutida à par
 
 **Verificação (D52):** neste kernel a fila filha **não** impede a reordenação. O ACK puro do
 handshake e o segmento de dados que o segue trocam de ordem em cerca de metade das conexões,
-com ou sem a `pfifo`. A intenção da D13 não é cumprida pelo aparato; decisão com a equipe.
+com ou sem a `pfifo`. A intenção da D13 não é cumprida pelo aparato. A equipe decidiu manter
+os dados e reportar a reordenação como limitação (D52).
 
 ### D14 — Backlog do servidor e alvos da varredura
 2026-11-25 · fase 3 · aberta
@@ -534,8 +687,8 @@ k_scan para cada janela, sobre o mesmo pcap de calibração.
   com N_s > k_s contra `poisson.sf(k_s, â_s)`) e as figuras ganham sufixo com o IP quando há
   mais de um servidor.
 
-### D52 — Resultado do diagnóstico da D35: reordenação no `netem`
-2026-11-26 · fase 8 · aberta · resultado da D35; contradiz a verificação da D13
+### D52 — Resultado do diagnóstico da D35: reordenação no `netem` **[equipe]**
+2026-11-26 · fase 8 · decidida · resultado da D35; contradiz a verificação da D13
 
 **Causa medida.** O `netem` sorteia um atraso independente N(50, 20) ms para cada pacote. O
 ACK puro do handshake e o segmento da requisição HTTP, que o cliente envia logo depois,
@@ -579,11 +732,14 @@ para contar reordenação. Na entrada, container − ponte fica entre 0 e 0,04 m
 idênticos (ACKs duplicados) são pareados pela ordem de ocorrência. Portas locais
 reutilizadas são excluídas: 19 na variante configurada, 0 sem fila filha, 1 sem jitter.
 
-**Pendente com a equipe:** manter os dados como estão (reordenação reportada como limitação)
-ou mudar o aparato para cumprir a D13 e refazer as capturas.
+**Decisão da equipe (2026-11-26):** os dados ficam como estão e a reordenação vira limitação do
+artigo. As capturas `calibracao_s43` e `teste_s42` e o `netem` (50 ± 20 ms, normal, com a fila
+`pfifo`) não mudam. O artigo reporta o T efetivo medido (Ê[T] = 38,7 ms na calibração), a causa
+(o `netem` com jitter reordena pacotes de uma mesma conexão; o handshake termina no primeiro
+segmento do cliente com ACK) e o resultado da variante sem jitter como controle.
 
-### D53 — P_D teórica também com a taxa realizada do episódio
-2026-11-26 · fase 8 · aberta
+### D53 — P_D teórica também com a taxa realizada do episódio **[equipe]**
+2026-11-26 · fase 8 · decidida
 
 O guia define b = λ_A × τ_hs com o λ_A do gerador e pede para reportar λ̂_A junto. As chegadas
 de ataque são Poisson, então o número de SYNs de um episódio de 300 s varia: na captura `teste`
@@ -594,8 +750,10 @@ de 15 esperados. A comparação pedida pelo guia (P_D teórica com λ_A nominal)
 esse valor como losango vazado. λ̂_A é estimado no episódio inteiro, pelos fluxos da faixa
 forjada. Motivo: separar o erro do modelo da variação amostral do gerador.
 
-### D54 — Dependência entre janelas e intervalos de Wilson
-2026-11-26 · fase 7–8 · aberta · sem mudança no código
+**Decisão da equipe (2026-11-26):** mantida como está.
+
+### D54 — Dependência entre janelas e intervalos de Wilson **[equipe]**
+2026-11-26 · fase 7–8 · decidida · sem mudança no código
 
 O guia pede intervalos de Wilson para P_D e P_FA por janela, e o Wilson supõe janelas
 independentes. Não são: um SYN de ataque fica pendente τ_hs = 63 s e entra em cerca de 63
@@ -603,12 +761,18 @@ retratos seguidos com W = 1 s; um episódio de SYN Flood a 0,02/s tem uns 6 SYNs
 237 retratos estacionários desse episódio carregam bem menos informação do que 237 ensaios
 independentes, e o IC de Wilson subestima a incerteza, principalmente nas taxas baixas e na
 P_FA do agregador. O mesmo vale, em menor grau, para o McNemar sobre janelas pareadas.
-Mantido como o guia pede. Opções para a equipe: reportar a limitação; acrescentar ICs por
+Mantido como o guia pede. Opções levadas à equipe: reportar a limitação; acrescentar ICs por
 bootstrap em blocos (blocos ≥ τ_hs); ou repetir os episódios de taxa baixa com várias sementes
 e usar o episódio como unidade.
 
-### D55 — Efeito de W na calibração do k empírico
-2026-11-26 · fase 6–8 · aberta · sem mudança no código
+**Decisão da equipe (2026-11-26):** reportar como limitação do artigo. Os intervalos de Wilson e
+o McNemar continuam como o guia pede, sem ICs adicionais. O artigo deve dizer que as janelas
+não são independentes (cada SYN de ataque fica pendente τ_hs e aparece em retratos seguidos)
+e que, por isso, os ICs por janela subestimam a incerteza, sobretudo nas taxas baixas de SYN
+Flood e na P_FA do agregador.
+
+### D55 — Efeito de W na calibração do k empírico **[equipe]**
+2026-11-26 · fase 6–8 · decidida · sem mudança no código
 
 Os retratos são tirados no fim de cada janela, então a calibração de 15 min rende 903
 retratos com W = 1 s, 180 com W = 5 s e 90 com W = 10 s. Com α = 0,01, o k empírico sai 2 com
@@ -616,6 +780,228 @@ W = 1 s e 1 com W = 5 s e 10 s; o k analítico é 2 nos três casos. Com k = 1, 
 agregador no teste é 3/191 = 0,016 (W = 5 s) e 2/57 = 0,035 (W = 10 s), acima de α, mas de
 acordo com a teoria para k = 1 (`poisson.sf(1, â)` = 0,0169). Com 90 ou 180 retratos, o
 quantil 1 − α = 0,99 fica mal estimado: no máximo 0 ou 1 retrato acima de k. Mantido como o
-guia pede (k empírico da calibração, mesmo W). Para decidir com a equipe: tirar os retratos da
+guia pede (k empírico da calibração, mesmo W). Opções levadas à equipe: tirar os retratos da
 calibração com W = 1 s em qualquer configuração, aumentar a calibração, ou usar o k analítico
 quando houver poucos retratos.
+
+**Decisão da equipe (2026-11-26):** mantida como está. O k empírico continua vindo da calibração
+com o mesmo W da execução, e os resultados de W = 5 s e 10 s (k = 1) são reportados como estão.
+
+### D56 — Implementação da tolerância de rótulo (D38)
+2026-11-27 · fase 9 · aberta
+
+- Parâmetro `avaliacao.tolerancia_rotulo_s` no YAML, obrigatório (0 em `default.yaml`, que é
+  o valor do laboratório, com rótulos exatos). O bloco `avaliacao` passa a ser obrigatório na
+  configuração.
+- Zona de tolerância: janelas que intersectam `[t_inicio − tol, t_inicio)` ou
+  `(t_fim, t_fim + tol]` de algum episódio. Precedência: positiva > transição > tolerância.
+  Uma janela positiva para qualquer episódio continua positiva, e uma janela que já está na
+  transição de τ_hs fica na transição. Benigna é a janela fora das três zonas.
+- Os alertas das janelas de tolerância vão para `transicao.csv` com `tipo_janela = tolerancia`.
+  `avaliacao.json` grava a tolerância usada e o número de janelas de tolerância.
+- A validação analítica usa a mesma rotulagem para escolher os retratos benignos do teste, de
+  modo que a P_FA empírica dela e a da avaliação vêm das mesmas janelas.
+- Sensibilidade (0, 60 e 300 s na D38): `tcpmon eval --tolerancia <s>` reavalia as mesmas
+  execuções; `experiments/run.py` faz isso para cada valor de
+  `avaliacao.sensibilidade_tolerancia_s` e grava em `eval-<data>/tolerancia_<s>s/`. A validação
+  analítica roda só com a tolerância principal.
+- Execuções antigas, sem `avaliacao` gravada em `run.json`, só são avaliadas com `--tolerancia`
+  explícito; a avaliação não supõe um valor.
+- Com tolerância 0, as tabelas do laboratório saem byte a byte iguais às da v0.5.0.
+
+### D57 — Origem declarada de τ_hs (D39)
+2026-11-27 · fase 9 · aberta
+
+Chave opcional `tau_hs_origem` (texto) no YAML. Quando o τ_hs não vem do metadado do
+laboratório, `run.json` grava essa origem (por exemplo, `documentacao_dataset`); sem a chave,
+grava `configuração (tau_hs_s)`, como antes. O metadado do laboratório continua tendo
+prioridade. A análise de sensibilidade com o padrão do Windows Server (D39) é só outro arquivo
+de experimento com `tau_hs_s` diferente; o valor depende da fonte oficial da Microsoft, ainda
+pendente com a equipe.
+
+### D58 — Formato da agenda transcrita e conversão para `labels.csv` (D38) **[equipe]**
+2026-11-27 · fase 9 · decidida
+
+- A agenda oficial é transcrita pela equipe num CSV com as colunas `episodio, classe, data,
+  inicio, fim, fuso, chave_tipo, chave_valor`; colunas extras (como `ataque_oficial` e `fonte`)
+  vão para `parametros`, junto com data, horários e fuso originais e o número da linha.
+  `tcpmon agenda` faz a conversão.
+- `fuso` aceita nome IANA ou deslocamento fixo. Com nome IANA, o horário de verão é aplicado
+  pela base do sistema (`America/Moncton` em julho = ADT, UTC−3); com deslocamento fixo
+  (`-03:00`, como diz a D38), o valor é usado tal como está.
+- Conversão literal: `inicio` e `fim` são os instantes da agenda, sem arredondar o minuto. Se a
+  agenda diz 10:10, o fim é 10:10:00; os segundos restantes daquele minuto ficam a cargo da
+  tolerância de ±60 s. Horário de fim antes do início (por exemplo, cruzando a meia-noite),
+  episódio duplicado, `chave_tipo` desconhecido, classe vazia e chave que não é IP são
+  reportados, nunca corrigidos (regra 7).
+- Uma linha tem uma única chave (um IP). Um ataque com vários atacantes, ou contra várias
+  vítimas, vira várias linhas com o mesmo horário; na avaliação por janela isso não muda nada
+  (a janela é detectada se algum alerta casa com alguma das chaves), mas latência e contagem
+  de episódios passam a ser por linha. **Decisão da equipe (2026-11-27):** mantido assim, uma
+  linha por IP.
+- O mapeamento dos ataques do dataset para as classes do monitor (`classe`, `chave_tipo`) é da
+  equipe e vem pronto na planilha; o conversor não interpreta o nome do ataque.
+
+### D66 — Classes fora da conta na avaliação (D64)
+2026-11-27 · fase 9 · aberta
+
+- Chave `avaliacao.classes_fora_da_conta` (lista de classes, vazia em `default.yaml`).
+  Episódios dessas classes não geram janelas positivas nem entram nas tabelas de P_D. As
+  janelas que eles intersectam não são positivas nem benignas, e os alertas delas vão para
+  `transicao.csv` com `tipo_janela = fora_da_conta`.
+- Transição de τ_hs e tolerância de rótulo valem para esses episódios como para os demais:
+  SYNs que tenham passado pelo firewall podem gerar alertas depois do fim.
+- Precedência: positiva > fora da conta > transição > tolerância.
+- A validação analítica usa a mesma rotulagem. Execuções sem a chave gravada são tratadas
+  como lista vazia: é uma lista de nomes, não um valor numérico do experimento.
+
+### D67 — Rascunhos das agendas do CIC-IDS2017 e do CIC-DDoS2019
+2026-11-27 · fase 9 · aberta · para a equipe conferir
+
+`configs/rotulos/cicids2017_agenda.csv` (49 episódios) e
+`configs/rotulos/cicddos2019_dia1_agenda.csv` (7 episódios), transcritos das páginas da D59.
+Cada linha guarda o texto oficial (`ataque_oficial`), atacante e vítima como a página os
+dá, e a URL da fonte. Escolhas de transcrição:
+
+- Horários literais ("10:43 – 11 a.m." → 10:43–11:00; "14:19" sozinho → 14:19–14:19). O fuso
+  `-03:00` do CIC-IDS2017 é o da D38, ainda a conferir no pcap (D59).
+- Uma linha por janela de horário: o Metasploit de quinta tem três (14:19, 14:20–14:21 e
+  14:33–14:35), e o PortScan com firewall ligado tem doze.
+- `chave_tipo` segue a regra do laboratório: `servidor` para DoS e DDoS contra um alvo
+  (192.168.10.50); `origem` para os demais. Os ataques externos com `origem` ficam com
+  `a_confirmar_nat` (D63).
+- Infiltração de quinta, 15:04–15:45: duas linhas, o primeiro passo (atacante externo contra
+  o Vista) e o segundo (o Vista, 192.168.10.8, varre os outros clientes), cada uma com sua
+  origem.
+- Botnet ARES: **proposta** de uma linha por máquina infectada, com a máquina como origem,
+  porque o tráfego de controle sai dela (D58). A página dá o Kali como atacante.
+- Classes próprias com o nome oficial (D62). O `sW` (window scan) também sonda com ACK isolado
+  e poderia ser `ack_sem_syn`; ficou como classe própria até a equipe decidir.
+- CIC-DDoS2019, primeiro dia: data, fuso e alvo ficam `a_confirmar` (D59); o conversor recusa
+  o arquivo até que sejam preenchidos.
+
+### D70 — Experimento do CIC-IDS2017 com um comando
+2026-11-27 · fase 9 · aberta
+
+`configs/experiments/cicids2017.yaml`: calibração na segunda, teste na sexta. Para datasets
+reais, `experiments/run.py` confere se os pcaps existem e converte a agenda em rótulos
+(`tcpmon agenda --dias 2017-07-07 --estrito`). Se a agenda tiver qualquer problema, o
+experimento para: rótulos com problema não entram em execução sem a equipe ver. A agenda
+cobre a semana; `--dias` seleciona pela coluna `data`, e só os episódios de sexta entram nos
+rótulos do teste. Carência G = 120 s (D40, valor de `default.yaml`), τ_hs = 63 s com origem
+`documentacao_dataset` (D39), tolerância de 60 s com sensibilidade em 0 e 300 s (D38).
+
+### D71 — Inclusão por traço com instâncias de mesmo início (correção)
+2026-11-27 · fase 9 · aberta · corrige a implementação da D33
+
+Na primeira execução sobre o CIC-IDS2017, a verificação C1 ⊆ C2 por traço apontou 209
+violações. Todas eram da verificação, não do monitor. Uma mesma chave pode ter duas instâncias
+com o mesmo instante de início (D72): a primeira é rejeitada na hora nas duas configurações, e
+a segunda só na C2, 63 s depois. A verificação indexava as instâncias da C2 por
+(chave, início) num dicionário, e a segunda sobrescrevia a primeira. Agora, para cada
+instância rejeitada na C1, basta que **alguma** instância da C2 com a mesma chave e o mesmo
+início seja rejeitada até o mesmo instante; na violação, reporta-se a mais cedo. O critério
+da D33 não muda. Teste: `test_inclusao_por_traco_com_mesmo_inicio`.
+
+### D72 — Resposta do servidor gravada antes do SYN, com o mesmo timestamp
+2026-11-27 · fase 9 · aberta · observação sobre o dado, nada corrigido
+
+Na sexta do CIC-IDS2017, 210 chaves têm a resposta do servidor (RST em 169, SYN-ACK em 40)
+gravada **antes** do SYN que a provocou, com o mesmo timestamp ao microssegundo; 208 delas
+são do scanner (172.16.0.1). Pela regra de leitura (ordem do arquivo, sem reordenar), a
+primeira instância começa pela resposta e vai para ⊥ (`SEM_HANDSHAKE`, `SYNACK_SEM_SYN` ou
+`TRANSICAO_INESPERADA`), e o SYN abre outra instância no mesmo instante. Na C1 ela fica em
+`SYN_VISTO` até a inatividade, e na C2 expira em τ_hs (`HANDSHAKE_EXPIRADO`). Esses alertas
+caem nas janelas do PortScan e contam para a P_D dele. O pcap não é alterado (regra 7) e a
+ordem não é corrigida (guia: processar na ordem do arquivo). O efeito vai para o artigo como
+artefato da captura.
+
+### D73 — Captura em vários arquivos e recorte no tempo
+2026-11-27 · fase 9 · aberta
+
+- `entrada.pcap` (e `--pcap`) aceita uma pasta: os arquivos são lidos em sequência, na ordem do
+  número no fim do nome (`_0`, `_01`, `_02`, …, `_010`; a ordem alfabética seria errada), como
+  uma captura só. Inversões de timestamp entre o fim de um arquivo e o início do seguinte são
+  contadas como as outras. Arquivos ocultos são ignorados.
+- `entrada.inicio` e `entrada.fim` (ISO 8601 com fuso, ou segundos desde a época) recortam a
+  captura em [início, fim). Quadros antes do início são pulados e contados à parte; a leitura
+  para no primeiro quadro com ts ≥ fim (um quadro anterior ao fim que venha depois, por inversão,
+  fica de fora). t0 e a carência G contam a partir do primeiro quadro do recorte. `--inicio` e
+  `--fim` sobrescrevem a configuração; texto vazio remove o limite.
+- `experiments/run.py` passa `experimento.calibracao_inicio/fim` para a calibração.
+- `run.json` grava o recorte, o número de arquivos, o SHA-256 de cada um e um SHA-256 único da
+  lista `nome:hash`. O recorte acontece na leitura, igual para C1, C2 e C3 (regra 2).
+- Memória: o motor passou a internar as strings de IP e a reaproveitar as tuplas da chave; as
+  saídas do laboratório são idênticas. Num ensaio de 5 min do SYN Flood (11 milhões de pacotes),
+  a C1 chegou a 2 milhões de fluxos vivos e 3,75 GB, porque cada conexão pendente fica até a
+  inatividade (3 600 s; D20).
+
+### D75 — Primeiros resultados nos datasets reais: observações
+2026-11-27 · fase 9 · aberta · nada foi ajustado; duas perguntas para a equipe
+
+Execuções: `results/cicids2017/` (commit 161abce) e `results/cicddos2019/` (commit e71ef13), cada uma
+com um comando (`experiments/run.py --config …`). Sem violação de inclusão C1 ⊆ C2 ⊆ C3 nos dois.
+
+- **k = 0 nos dois datasets.** Numa rede local o handshake termina em milissegundos, e o retrato no
+  fim da janela quase nunca tem um pendente: â = 0,0043 (192.168.10.50, segunda-feira) e 0,0081
+  (192.168.50.4). A P_FA do agregador no teste confere com a teoria: 0,0069 [0,0043; 0,0112] contra
+  `poisson.sf(0, â)` = 0,0080 no CIC-DDoS2019. A lei de Little confere nos dois (0,00432 × 0,00434;
+  0,0091 × 0,0081). 192.168.10.51 não recebe nenhuma conexão na segunda (λ̂_L = 0).
+- **CIC-IDS2017, falsos alarmes da C1** (442 janelas benignas de 19 421): quase todos
+  `TRANSICAO_INESPERADA`, sobretudo `SYN_VISTO` + `C.ACK` (o SYN-ACK não está na captura) e
+  `FECHADO` + `S.SYNACK` (SYN-ACK retransmitido depois do fecho). São pacotes ausentes ou
+  retransmissões na captura, não ataque; o autômato da camada 1 não tolera perda de pacote.
+- **CIC-DDoS2019, SYN Flood:** o episódio oficial vai de 11:28 a 17:35, mas o ataque na captura
+  dura cerca de 9 min (450 456 SYN entre 11:30 e 11:39; antes disso, desde 11:28). De 11:40 em
+  diante chegam ao alvo cerca de 100 SYN a cada 10 min, no nível do tráfego benigno. Nas janelas
+  do ataque efetivo a detecção da C2 e da C3 é quase total; na média do episódio, P_D = 0,022 (C2)
+  e 0,068 (C3). Os ataques UDP (PortMap, NetBIOS, LDAP, MSSQL, UDP, UDP-Lag) não são TCP e ficam
+  com P_D ≈ 0, como esperado.
+- **Validação analítica do SYN Flood nos dados reais:** não foi feita. O código só trata episódios
+  com λ_A do gerador (`parametros.lambda_A`), que existe só no laboratório.
+- Desempenho: segunda-feira do CIC-IDS2017 (11,7 milhões de pacotes) em 3 min 47 s; sexta (10
+  milhões) em cerca de 3 min por configuração. CIC-DDoS2019 (61 milhões de pacotes TCP e não TCP)
+  em 11–12 min por configuração, com pico de 2,9 milhões de fluxos e 4,2 GB na C1, e 6,4 GB na C2
+  (2,67 milhões de alertas em memória).
+
+**Para a equipe:**
+1. SYN Flood do CIC-DDoS2019: manter o episódio de 11:28 a 17:35 como está (P_D média baixa,
+   explicada no artigo) ou também reportar, à parte, as janelas em que o ataque aparece na captura?
+2. Validação analítica no CIC-DDoS2019: estimar λ̂_A pela captura (SYNs do atacante ao alvo) e
+   comparar com o modelo, ou deixar a validação analítica só para o laboratório?
+
+### D76 — Recorte de rajada e validação analítica com λ̂_A nos dados reais **[equipe]**
+2026-11-27 · fase 9 · decidida (D75) · implementação aberta para revisão
+
+Decisões da equipe: o resultado principal usa o episódio oficial do SYN Flood do CIC-DDoS2019
+(11:28–17:35) e, à parte, analisa-se o trecho em que o ataque aparece na captura; a validação
+analítica nos dados reais usa λ̂_A estimado na captura.
+
+Implementação:
+- `tcpmon recorte` grava **outro** `labels.csv` (os rótulos oficiais não mudam). O episódio passa
+  a cobrir só a rajada, e as partes antes e depois dela viram `synflood_fora_da_rajada`, fora da
+  conta.
+- Rajada: instâncias novas (iniciadas por SYN, sem `midstream`) para o servidor alvo, contadas em
+  intervalos de `bin_s` (60 s no YAML) a partir do início do episódio. Limiar = maior contagem por
+  intervalo para esse servidor na **calibração** (só benigno). A rajada é a primeira sequência
+  contínua de intervalos acima do limiar dentro do episódio. (Correção: a primeira versão exigia
+  que ela começasse no primeiro intervalo; no CIC-DDoS2019 o ataque começa um minuto depois do
+  horário da agenda, com 3 instâncias novas em 11:28 e 441 791 em 11:29, contra limiar 11, e o
+  recorte saía vazio.)
+- `experiments/run.py` (com `experimento.recorte`) roda a avaliação sobre o recorte em
+  `eval-…/recorte_rajada/` e a validação analítica em `<C3>/recorte_rajada/`.
+- Validação analítica: episódios das classes em `avaliacao.classes_syn_flood` com chave
+  `servidor` entram mesmo sem λ_A do gerador. λ̂_A = (instâncias novas para o alvo no episódio −
+  λ̂_L · duração) / duração, com λ̂_L da calibração; b = λ̂_A · τ_hs. Os arquivos marcam
+  `lambda_A_origem = estimada` e as figuras dizem "λ̂_A estimada". No laboratório nada muda
+  (`lambda_A_origem = gerador`).
+
+**Resultado (2026-11-28, commit 842e8d3):** rajada de 11:29 a 11:38 (limiar da calibração: 11
+instâncias novas por minuto; na rajada, de 441 mil a 642 mil por minuto). Nas 541 janelas da
+rajada: P_D = 0 (C1), 0,889 (C2) e 0,967 (C3); latência de 81 s (C2) e 18 s (C3); McNemar
+C2 × C3: ΔP_D = 0,078 [0,056; 0,103]. Validação analítica: no recorte, λ̂_A ≈ 9 305 SYN/s, P_D
+teórica e empírica = 1 com k = 0, mas a média dos retratos estacionários (cerca de 363 mil
+pendentes) é 62% de â + b (cerca de 586 mil). No episódio oficial, λ̂_A médio = 228 SYN/s dá P_D
+teórica 1 contra 0,068 medida: o modelo supõe taxa constante, e o ataque na captura é uma rajada
+curta. As duas divergências são reportadas como estão.
+

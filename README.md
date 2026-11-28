@@ -29,13 +29,18 @@ as curvas teóricas do modelo M/G/∞.
 | 6 | Camada 3 — Agregador e calibração | ✅ |
 | 7 | Avaliação | ✅ |
 | 8 | Validação analítica | ✅ |
-| 9 | CIC-IDS2017 e CIC-DDoS2019 (D37) | bloqueada: aguardando a equipe (servidores e pcaps) |
+| 9 | CIC-IDS2017 e CIC-DDoS2019 (D37) | pipeline completo roda sobre um dia de cada (D75) |
 | 10 | Baselines Zeek e Suricata (D41) | depois da fase 9 |
 
-Decisões abertas com a equipe sobre os resultados do laboratório: D52 (o `netem` com jitter
-reordena pacotes, e T efetivo ≈ 39 ms), D53 (P_D teórica com a taxa realizada), D54
-(dependência entre janelas nos intervalos de Wilson) e D55 (efeito de W no k empírico). Ver
-[DECISIONS.md](DECISIONS.md).
+Limitações reportadas no artigo (decididas pela equipe):
+
+- D52: o `netem` com jitter reordena pacotes de uma mesma conexão, e o T benigno efetivo é
+  ≈ 39 ms. Os dados do laboratório ficam como estão.
+- D54: as janelas não são independentes, e os intervalos de Wilson por janela subestimam a
+  incerteza, sobretudo nas taxas baixas de SYN Flood e na P_FA do agregador.
+
+Também decididas, sem mudanças: D53 (a P_D teórica com a taxa realizada continua junto da
+nominal) e D55 (k empírico da calibração com o mesmo W). Ver [DECISIONS.md](DECISIONS.md).
 
 ## Instalação
 
@@ -65,6 +70,13 @@ de Newcombe), `falsos_alarmes.csv`, `transicao.csv`, `desempenho.csv`, `inclusao
 `resumo.md`. A inclusão C1 ⊆ C2 é verificada por traço rejeitado e C2 ⊆ C3 por alerta
 idêntico (D33); a divergência por janela entre C1 e C2 é reportada à parte.
 
+Tolerância de rótulo (D38): com `avaliacao.tolerancia_rotulo_s` > 0, as janelas em
+`[t_inicio − tol, t_inicio)` e `(t_fim, t_fim + tol]` de cada episódio não são positivas nem
+benignas, e os alertas delas vão para `transicao.csv` com `tipo_janela = tolerancia`. No
+laboratório, a tolerância é 0 (rótulos exatos). `tcpmon eval --tolerancia <s>` sobrescreve o valor
+gravado nas execuções. `experiments/run.py` repete a avaliação para cada valor de
+`avaliacao.sensibilidade_tolerancia_s`, em `eval-<data>/tolerancia_<s>s/`.
+
 ### Validação analítica e reprodução completa
 
 ```bash
@@ -85,7 +97,31 @@ empíricos dos retratos estacionários. Grava `analytic.json`, `curvas_roc.csv`,
 configuração efetiva): `alerts.csv`, `flows.csv`, `counters.json` e `run.json` (configuração
 completa, commit Git, τ_hs e sua origem, SHA-256 do pcap, versões das bibliotecas, semente,
 pacotes por segundo, pico de fluxos e de memória). τ_hs vem do metadado do laboratório
-(`<pcap>.meta.json`) quando existe; senão, de `tau_hs_s`.
+(`<pcap>.meta.json`) quando existe; senão, de `tau_hs_s`, com a origem de `tau_hs_origem` (D39).
+
+### Rótulos dos datasets reais
+
+A agenda oficial de ataques é transcrita pela equipe num CSV, uma linha por episódio, com
+horários locais. `tcpmon agenda` converte para `labels.csv` em UTC, o mesmo relógio do pcap
+(D38, D58):
+
+```bash
+tcpmon agenda --entrada data/cicids2017/agenda.csv --saida data/cicids2017/labels.csv
+```
+
+```
+episodio,classe,data,inicio,fim,fuso,chave_tipo,chave_valor,ataque_oficial
+```
+
+`fuso` aceita nome IANA (`America/Moncton`) ou deslocamento fixo (`-03:00`). Colunas extras
+vão para `parametros`. A conversão é literal: nada é ajustado ou descartado, e os problemas
+(horário de fim antes do início, episódio duplicado, chave que não é IP) são impressos sem
+correção.
+
+Os rascunhos transcritos das páginas oficiais ficam em `configs/rotulos/`
+(`cicids2017_agenda.csv`, `cicddos2019_dia1_agenda.csv`; D59, D67) e só viram rótulos depois de a
+equipe conferir. Episódios de classes listadas em `avaliacao.classes_fora_da_conta` (por
+exemplo, `portscan_firewall_ligado`, na D64) não são positivos nem benignos.
 
 Exemplo de saída:
 
@@ -193,6 +229,25 @@ configuração padrão e altera só o necessário:
 base: ../default.yaml
 camadas: [1, 2]
 janela_s: 5.0
+```
+
+Uma captura dividida em vários arquivos é passada como pasta (lida em ordem numérica pelo
+sufixo do nome), e `entrada.inicio` / `entrada.fim` recortam um intervalo (D73):
+
+```bash
+tcpmon calibrate --config configs/experiments/cicddos2019.yaml --pcap data/pcaps/PCAP-03-11 \
+    --inicio "" --fim 2018-11-03T09:42:00-03:00
+python experiments/run.py --config configs/experiments/cicids2017.yaml    # segunda → sexta
+python experiments/run.py --config configs/experiments/cicddos2019.yaml   # 3/11/2018
+```
+
+Chaves para os datasets reais (fase 9):
+
+```yaml
+tau_hs_origem: documentacao_dataset   # D39: origem de tau_hs_s gravada em run.json
+avaliacao:
+  tolerancia_rotulo_s: 60.0           # D38
+  sensibilidade_tolerancia_s: [0.0, 300.0]
 ```
 
 ## Testes

@@ -13,6 +13,7 @@ import hashlib
 import ipaddress
 import json
 from dataclasses import dataclass
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +40,7 @@ _OBRIGATORIAS = (
     "agregador",
     "entrada",
     "saida",
+    "avaliacao",
 )
 
 
@@ -53,9 +55,24 @@ class AgregadorCfg:
 
 @dataclass(frozen=True)
 class EntradaCfg:
-    pcap: str | None
+    pcap: str | None  # arquivo ou pasta de arquivos em sequência (D73)
     rotulos: str | None
     metadado: str | None
+    inicio: float | None = None  # D73: recorte [inicio, fim) em segundos desde a época (UTC)
+    fim: float | None = None
+
+
+@dataclass(frozen=True)
+class AvaliacaoCfg:
+    # D38: tolerância dos rótulos. Janelas em [t_inicio − tol, t_inicio) e (t_fim, t_fim + tol]
+    # não são positivas nem benignas. 0 = rótulos exatos (laboratório).
+    tolerancia_rotulo_s: float
+    # Valores extras de tolerância avaliados como análise de sensibilidade (experiments/run.py).
+    sensibilidade_tolerancia_s: tuple[float, ...]
+    # D64: classes de episódio cujas janelas não são positivas nem benignas.
+    classes_fora_da_conta: tuple[str, ...] = ()
+    # D76: classes de SYN Flood dos datasets reais (validação analítica com λ̂_A estimado).
+    classes_syn_flood: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -72,8 +89,12 @@ class Config:
     agregador: AgregadorCfg
     entrada: EntradaCfg
     saida: str
+    avaliacao: AvaliacaoCfg
     raw: dict[str, Any]
     origem: str | None = None
+    # D39: origem declarada de tau_hs_s quando ele não vem do metadado do laboratório
+    # (p. ex. "documentacao_dataset"); gravada em run.json.
+    tau_hs_origem: str | None = None
 
     def hash_curto(self) -> str:
         """Hash curto e estável da configuração (usado no run_id)."""
@@ -126,17 +147,48 @@ def carregar_yaml(path: str | Path) -> dict[str, Any]:
     return _load_raw(Path(path))
 
 
-def _num(raw: dict[str, Any], chave: str, minimo: float | None = 0.0, estrito: bool = False) -> float:
+def _num(
+    raw: dict[str, Any], chave: str, minimo: float | None = 0.0, estrito: bool = False, nome: str | None = None
+) -> float:
     valor = raw[chave]
+    nome = nome or chave
     if isinstance(valor, bool) or not isinstance(valor, (int, float)):
-        raise ConfigError(f"'{chave}' precisa ser numérico, recebido {valor!r}")
+        raise ConfigError(f"'{nome}' precisa ser numérico, recebido {valor!r}")
     valor = float(valor)
     if minimo is not None:
         if estrito and valor <= minimo:
-            raise ConfigError(f"'{chave}' precisa ser > {minimo}, recebido {valor}")
+            raise ConfigError(f"'{nome}' precisa ser > {minimo}, recebido {valor}")
         if not estrito and valor < minimo:
-            raise ConfigError(f"'{chave}' precisa ser >= {minimo}, recebido {valor}")
+            raise ConfigError(f"'{nome}' precisa ser >= {minimo}, recebido {valor}")
     return valor
+
+
+def _instante(valor: Any, nome: str) -> float | None:
+    """Instante absoluto: ISO 8601 com fuso (texto ou datetime do YAML) ou segundos desde a época."""
+    if valor is None:
+        return None
+    if isinstance(valor, bool):
+        raise ConfigError(f"'{nome}' inválido: {valor!r}")
+    if isinstance(valor, (int, float)):
+        return float(valor)
+    if isinstance(valor, str):
+        try:
+            valor = datetime.fromisoformat(valor)
+        except ValueError:
+            raise ConfigError(f"'{nome}' não é ISO 8601: {valor!r}") from None
+    if isinstance(valor, datetime):
+        if valor.tzinfo is None:
+            raise ConfigError(f"'{nome}' precisa de fuso explícito (ex.: 2018-11-03T09:42:00-03:00): {valor!r}")
+        return valor.timestamp()
+    raise ConfigError(f"'{nome}' inválido: {valor!r}")
+
+
+def _lista_texto(valor: Any, nome: str) -> tuple[str, ...]:
+    if valor is None:
+        return ()
+    if not isinstance(valor, list) or not all(isinstance(v, str) and v for v in valor):
+        raise ConfigError(f"'{nome}' precisa ser uma lista de textos, recebido {valor!r}")
+    return tuple(valor)
 
 
 def _servidores(valor: Any) -> tuple[str, ...] | None:
@@ -205,14 +257,41 @@ def from_dict(raw: dict[str, Any], origem: str | None = None) -> Config:
     )
 
     ent = raw["entrada"] or {}
+    inicio, fim = _instante(ent.get("inicio"), "entrada.inicio"), _instante(ent.get("fim"), "entrada.fim")
+    if inicio is not None and fim is not None and fim <= inicio:
+        raise ConfigError(f"'entrada.fim' precisa ser posterior a 'entrada.inicio' ({ent.get('inicio')} .. {ent.get('fim')})")
     entrada = EntradaCfg(
         pcap=ent.get("pcap"),
         rotulos=ent.get("rotulos"),
         metadado=ent.get("metadado"),
+        inicio=inicio,
+        fim=fim,
     )
+
+    av = raw["avaliacao"] or {}
+    if "tolerancia_rotulo_s" not in av:
+        raise ConfigError("chave obrigatória ausente: avaliacao.tolerancia_rotulo_s")
+    sens = av.get("sensibilidade_tolerancia_s") or []
+    if not isinstance(sens, list):
+        raise ConfigError(f"'avaliacao.sensibilidade_tolerancia_s' precisa ser lista, recebido {sens!r}")
+    avaliacao = AvaliacaoCfg(
+        tolerancia_rotulo_s=_num(av, "tolerancia_rotulo_s", 0.0, nome="avaliacao.tolerancia_rotulo_s"),
+        sensibilidade_tolerancia_s=tuple(
+            _num({"v": v}, "v", 0.0, nome="avaliacao.sensibilidade_tolerancia_s") for v in sens
+        ),
+        classes_fora_da_conta=_lista_texto(av.get("classes_fora_da_conta"), "avaliacao.classes_fora_da_conta"),
+        classes_syn_flood=_lista_texto(av.get("classes_syn_flood"), "avaliacao.classes_syn_flood"),
+    )
+    tau_origem = raw.get("tau_hs_origem")
+    if tau_origem is not None and not isinstance(tau_origem, str):
+        raise ConfigError(f"'tau_hs_origem' precisa ser texto, recebido {tau_origem!r}")
 
     raw_norm = copy.deepcopy(raw)
     raw_norm["camadas"] = list(camadas)
+    for chave in ("inicio", "fim"):  # o YAML pode trazer datetime; guarda-se o texto ISO 8601
+        v = (raw_norm.get("entrada") or {}).get(chave)
+        if isinstance(v, (datetime, date)):
+            raw_norm["entrada"][chave] = v.isoformat()
 
     return Config(
         semente=int(semente),
@@ -227,8 +306,10 @@ def from_dict(raw: dict[str, Any], origem: str | None = None) -> Config:
         agregador=agregador,
         entrada=entrada,
         saida=str(raw["saida"]),
+        avaliacao=avaliacao,
         raw=raw_norm,
         origem=origem,
+        tau_hs_origem=tau_origem,
     )
 
 

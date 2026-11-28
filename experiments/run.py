@@ -6,11 +6,13 @@
     python experiments/run.py --todos --gerar         # regenera também os pcaps do laboratório
 
 Para cada configuração de experimento:
-1. gera os pcaps do laboratório se não existirem (ou com --gerar);
+1. gera os pcaps do laboratório se não existirem (ou com --gerar); nos datasets reais
+   (``experimento.agenda``), confere os pcaps e converte a agenda oficial em rótulos;
 2. calibra k e k_scan no pcap de calibração (só benigno);
 3. executa C1, C2 e C3 sobre o pcap de teste, cada uma num processo próprio (para que o pico
    de memória medido seja o da configuração);
-4. avalia (tcpmon eval) e faz a validação analítica (tcpmon analytic);
+4. avalia (tcpmon eval), repete a avaliação para cada valor de
+   ``avaliacao.sensibilidade_tolerancia_s`` (D38) e faz a validação analítica (tcpmon analytic);
 5. grava ``<saida>/experimento.json`` com as pastas produzidas.
 """
 
@@ -42,7 +44,22 @@ def rodar(cmd: list[str]) -> str:
     return linhas[0] if linhas else ""
 
 
+def dados_de_dataset(cfg, exp: dict) -> None:
+    """Datasets reais: os pcaps já baixados e os rótulos convertidos da agenda (D58)."""
+    for pcap in (REPO / exp["calibracao_pcap"], REPO / cfg.entrada.pcap):
+        if not pcap.exists():
+            raise SystemExit(f"pcap ausente: {pcap.relative_to(REPO)} (baixe o dataset; ver DECISIONS.md, D60)")
+        print(f"[dados] {pcap.relative_to(REPO)}", flush=True)
+    cmd = TCPMON + ["agenda", "--entrada", exp["agenda"], "--saida", cfg.entrada.rotulos, "--estrito"]
+    if exp.get("agenda_dias"):
+        cmd += ["--dias", *map(str, exp["agenda_dias"])]
+    rodar(cmd)
+
+
 def gerar_dados(cfg, exp: dict, forcar: bool) -> None:
+    if "agenda" in exp:
+        dados_de_dataset(cfg, exp)
+        return
     pcap_teste = REPO / cfg.entrada.pcap
     pcap_cal = REPO / exp["calibracao_pcap"]
     pares = (
@@ -68,7 +85,12 @@ def experimento(caminho: Path, forcar_geracao: bool) -> dict:
         raise SystemExit(f"{caminho}: falta a seção 'experimento.calibracao_pcap'")
     gerar_dados(cfg, exp, forcar_geracao)
 
-    cal = rodar(TCPMON + ["calibrate", "--config", str(caminho), "--pcap", exp["calibracao_pcap"]])
+    args_cal = TCPMON + ["calibrate", "--config", str(caminho), "--pcap", exp["calibracao_pcap"]]
+    # D73: recorte da calibração (ex.: trecho benigno antes do primeiro ataque, D61). Sem essas
+    # chaves, a calibração herda entrada.inicio/fim; com elas, o recorte é só o informado.
+    if "calibracao_inicio" in exp or "calibracao_fim" in exp:
+        args_cal += ["--inicio", str(exp.get("calibracao_inicio") or ""), "--fim", str(exp.get("calibracao_fim") or "")]
+    cal = rodar(args_cal)
     execucoes = {}
     for camadas in exp.get("configuracoes", [[1], [1, 2], [1, 2, 3]]):
         rotulo = f"C{max(camadas)}"
@@ -79,18 +101,41 @@ def experimento(caminho: Path, forcar_geracao: bool) -> dict:
     for pasta in execucoes.values():
         args_eval += ["--run", pasta]
     avaliacao = rodar(args_eval)
+    # D38: análise de sensibilidade da tolerância de rótulo, com as mesmas execuções.
+    sensibilidade = {}
+    for tol in cfg.avaliacao.sensibilidade_tolerancia_s:
+        destino = Path(avaliacao) / f"tolerancia_{tol:g}s"
+        sensibilidade[f"{tol:g}"] = rodar(args_eval + ["--tolerancia", repr(tol), "--saida", str(destino)])
     analitica = None
     if "C3" in execucoes:
         analitica = rodar(
             TCPMON + ["analytic", "--calibracao", str(Path(cal).parent), "--teste", execucoes["C3"]]
         )
+    # D76: análise à parte do trecho do episódio em que o ataque aparece na captura.
+    recorte = None
+    if exp.get("recorte") and "C3" in execucoes:
+        rc = exp["recorte"]
+        rot_rec = str(Path(cfg.entrada.rotulos).with_name(Path(cfg.entrada.rotulos).stem + "_recorte.csv"))
+        rodar(TCPMON + ["recorte", "--rotulos", cfg.entrada.rotulos, "--calibracao", str(Path(cal).parent),
+                        "--teste", execucoes["C3"], "--classe", rc["classe"], "--bin", repr(float(rc["bin_s"])),
+                        "--saida", rot_rec])
+        args_rec = [a for a in args_eval]
+        args_rec[args_rec.index("--rotulos") + 1] = rot_rec
+        recorte = {
+            "rotulos": rot_rec,
+            "avaliacao": rodar(args_rec + ["--saida", str(Path(avaliacao) / "recorte_rajada")]),
+            "analitica": rodar(TCPMON + ["analytic", "--calibracao", str(Path(cal).parent), "--teste", execucoes["C3"],
+                                         "--rotulos", rot_rec, "--saida", str(Path(execucoes["C3"]) / "recorte_rajada")]),
+        }
     resumo = {
         "config": str(caminho),
         "quando": datetime.now().isoformat(timespec="seconds"),
         "calibracao": cal,
         "execucoes": execucoes,
         "avaliacao": avaliacao,
+        "sensibilidade_tolerancia": sensibilidade,
         "analitica": analitica,
+        "recorte_rajada": recorte,
     }
     saida = REPO / cfg.saida
     saida.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,26 @@
+# CIC-DDoS2019, "First Day" (3/11/2018): calibração no trecho benigno antes do primeiro ataque
+# (D61), teste no resto do dia. Captura em 146 arquivos lidos em sequência (D73).
+base: ../default.yaml
+tau_hs_s: 63.0
+tau_hs_origem: documentacao_dataset   # D39: servidor Ubuntu 16.04 (Linux, tcp_synack_retries = 5, RTO 1 s)
+entrada:
+  pcap: data/pcaps/PCAP-03-11
+  rotulos: data/rotulos/cicddos2019_dia1_labels.csv   # gerado da agenda por experiments/run.py
+  inicio: "2018-11-03T09:42:00-03:00"                  # D74: 60 s antes do primeiro ataque (9:43)
+agregador:
+  servidores: [192.168.50.4]                           # D74: alvo de todos os ataques do dia na captura
+avaliacao:
+  tolerancia_rotulo_s: 60.0                            # D38
+  sensibilidade_tolerancia_s: [0.0, 300.0]             # D38
+  classes_fora_da_conta: [synflood_fora_da_rajada]     # D76: só existe nos rótulos do recorte
+  classes_syn_flood: [synflood]                        # D76
+saida: results/cicddos2019/
+experimento:
+  calibracao_pcap: data/pcaps/PCAP-03-11
+  calibracao_fim: "2018-11-03T09:42:00-03:00"          # D61, D74
+  agenda: configs/rotulos/cicddos2019_dia1_agenda.csv
+  agenda_dias: ["2018-11-03"]
+  configuracoes: [[1], [1, 2], [1, 2, 3]]
+  recorte:                                             # D76: análise à parte da rajada do SYN Flood
+    classe: synflood
+    bin_s: 60.0

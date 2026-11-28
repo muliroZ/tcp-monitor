@@ -1,0 +1,26 @@
+# CIC-IDS2017: calibração na segunda-feira (D40), teste na sexta-feira (D60).
+# Pcaps conferidos contra os MD5 publicados; caminhos como a equipe os baixou.
+base: ../default.yaml
+tau_hs_s: 63.0
+tau_hs_origem: documentacao_dataset   # D39: servidores Ubuntu (Linux, tcp_synack_retries = 5, RTO 1 s)
+entrada:
+  pcap: data/pcaps/Friday-WorkingHours.pcap
+  rotulos: data/rotulos/cicids2017_sexta_labels.csv   # gerado da agenda por experiments/run.py
+agregador:
+  servidores: [192.168.10.50, 192.168.10.51]          # D36: Web server 16 e Ubuntu server 12 (D59)
+avaliacao:
+  tolerancia_rotulo_s: 60.0                            # D38
+  sensibilidade_tolerancia_s: [0.0, 300.0]             # D38
+  classes_fora_da_conta:                               # D64 e D68
+    - portscan_firewall_ligado
+    - portscan_sF
+    - portscan_sX
+    - portscan_sN
+    - portscan_sA
+    - portscan_sW
+saida: results/cicids2017/
+experimento:
+  calibracao_pcap: data/pcaps/Monday-WorkingHours.pcap
+  agenda: configs/rotulos/cicids2017_agenda.csv        # D59, D67
+  agenda_dias: ["2017-07-07"]
+  configuracoes: [[1], [1, 2], [1, 2, 3]]

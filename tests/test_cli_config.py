@@ -67,3 +67,41 @@ def test_tau_padrao_linux():
     assert tau_hs_de_synack_retries(5, 1.0) == 63.0
     assert tau_hs_de_synack_retries(0, 1.0) == 1.0
     assert tau_hs_de_synack_retries(2, 1.0) == 7.0
+
+
+def test_config_exige_avaliacao():
+    raw = load_config(REPO / "configs" / "default.yaml").raw
+    del raw["avaliacao"]
+    with pytest.raises(ConfigError, match="avaliacao"):
+        from_dict(raw)
+    raw["avaliacao"] = {"sensibilidade_tolerancia_s": [60]}
+    with pytest.raises(ConfigError, match="tolerancia_rotulo_s"):
+        from_dict(raw)
+    raw["avaliacao"] = {"tolerancia_rotulo_s": -1}
+    with pytest.raises(ConfigError, match="tolerancia_rotulo_s"):
+        from_dict(raw)
+
+
+def test_config_avaliacao_padrao():
+    cfg = load_config(REPO / "configs" / "default.yaml")
+    assert cfg.avaliacao.tolerancia_rotulo_s == 0.0 and cfg.avaliacao.sensibilidade_tolerancia_s == ()
+    assert cfg.tau_hs_origem is None
+    assert cfg.avaliacao.classes_fora_da_conta == ()
+    raw = cfg.raw
+    raw["avaliacao"]["classes_fora_da_conta"] = ["a", 3]
+    with pytest.raises(ConfigError, match="classes_fora_da_conta"):
+        from_dict(raw)
+
+
+def test_tau_origem_declarada(tmp_path):
+    """D39: sem metadado do laboratório, run.json grava a origem declarada na configuração."""
+    from tcpmon.pipeline import resolver_tau
+
+    pcap = tmp_path / "dia.pcap"  # sem .meta.json ao lado
+    cfg = load_config(REPO / "configs" / "default.yaml")
+    assert resolver_tau(cfg, pcap) == (63.0, "configuração (tau_hs_s)", None)
+    cfg = cfg.com(tau_hs_origem="documentacao_dataset")
+    assert resolver_tau(cfg, pcap) == (63.0, "documentacao_dataset", None)
+    with pytest.raises(ConfigError, match="tau_hs_origem"):
+        cfg.com(tau_hs_origem=63)
+

@@ -65,8 +65,18 @@ class ViolacaoTraco:
 
 
 def inclusao_por_traco(menor: list[Rejeitada], maior: list[Rejeitada]) -> list[ViolacaoTraco]:
-    """Instâncias rejeitadas em ``menor`` sem rejeição correspondente e tão cedo em ``maior``."""
-    idx = {(r.chave, r.inicio): r for r in maior}
+    """Instâncias rejeitadas em ``menor`` sem rejeição correspondente e tão cedo em ``maior``.
+
+    Mais de uma instância pode ter a mesma (chave, início): por exemplo, quando a resposta do
+    servidor e o SYN que a provocou têm o mesmo timestamp, a primeira instância é rejeitada e o
+    SYN abre outra no mesmo instante (D71). Basta que alguma delas, em ``maior``, seja
+    rejeitada até o ``t_alerta`` de ``menor``; na violação, reporta-se a mais cedo.
+    """
+    idx: dict[tuple[str, float], Rejeitada] = {}
+    for r in maior:
+        k = (r.chave, r.inicio)
+        if k not in idx or r.t_alerta < idx[k].t_alerta:
+            idx[k] = r
     out = []
     for r in menor:
         m = idx.get((r.chave, r.inicio))
