@@ -111,6 +111,22 @@ def experimento(caminho: Path, forcar_geracao: bool) -> dict:
         analitica = rodar(
             TCPMON + ["analytic", "--calibracao", str(Path(cal).parent), "--teste", execucoes["C3"]]
         )
+    # D76: análise à parte do trecho do episódio em que o ataque aparece na captura.
+    recorte = None
+    if exp.get("recorte") and "C3" in execucoes:
+        rc = exp["recorte"]
+        rot_rec = str(Path(cfg.entrada.rotulos).with_name(Path(cfg.entrada.rotulos).stem + "_recorte.csv"))
+        rodar(TCPMON + ["recorte", "--rotulos", cfg.entrada.rotulos, "--calibracao", str(Path(cal).parent),
+                        "--teste", execucoes["C3"], "--classe", rc["classe"], "--bin", repr(float(rc["bin_s"])),
+                        "--saida", rot_rec])
+        args_rec = [a for a in args_eval]
+        args_rec[args_rec.index("--rotulos") + 1] = rot_rec
+        recorte = {
+            "rotulos": rot_rec,
+            "avaliacao": rodar(args_rec + ["--saida", str(Path(avaliacao) / "recorte_rajada")]),
+            "analitica": rodar(TCPMON + ["analytic", "--calibracao", str(Path(cal).parent), "--teste", execucoes["C3"],
+                                         "--rotulos", rot_rec, "--saida", str(Path(execucoes["C3"]) / "recorte_rajada")]),
+        }
     resumo = {
         "config": str(caminho),
         "quando": datetime.now().isoformat(timespec="seconds"),
@@ -119,6 +135,7 @@ def experimento(caminho: Path, forcar_geracao: bool) -> dict:
         "avaliacao": avaliacao,
         "sensibilidade_tolerancia": sensibilidade,
         "analitica": analitica,
+        "recorte_rajada": recorte,
     }
     saida = REPO / cfg.saida
     saida.mkdir(parents=True, exist_ok=True)

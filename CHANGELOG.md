@@ -3,13 +3,18 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/);
 versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 
-## [Não lançado]
+## [0.6.0] — 2026-11-28
+
+Fase 9: CIC-IDS2017 e CIC-DDoS2019.
 
 ### Corrigido
+- D76: a rajada do recorte pode começar depois do início do episódio.
 - D71: a verificação C1 ⊆ C2 por traço considera todas as instâncias da C2 com a mesma chave e
   o mesmo início (antes, uma sobrescrevia a outra e apareciam violações falsas).
 
 ### Adicionado
+- D76: `tcpmon recorte` (rajada do episódio, rótulos à parte), validação analítica com λ̂_A
+  estimado nos datasets reais (`avaliacao.classes_syn_flood`), `tcpmon analytic --rotulos --saida`.
 - D73: captura em vários arquivos (pasta lida em ordem numérica) e recorte no tempo
   (`entrada.inicio`, `entrada.fim`, `--inicio`, `--fim`); `configs/experiments/cicddos2019.yaml`.
 - D38 (D56): tolerância de rótulo na avaliação e na validação analítica

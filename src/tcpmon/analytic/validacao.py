@@ -148,8 +148,18 @@ def _alvo(ep) -> str:
     return ep.chave_valor
 
 
-def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> Path:
+def validar_modelo(
+    pasta_cal: Path,
+    pasta_teste: Path,
+    figuras: bool = True,
+    rotulos: str | Path | None = None,
+    saida: str | Path | None = None,
+) -> Path:
+    """Validação analítica. ``rotulos`` sobrescreve os rótulos da execução de teste e ``saida``
+    a pasta dos resultados (padrão: a pasta de teste), para análises à parte (D76)."""
     pasta_cal, pasta_teste = Path(pasta_cal), Path(pasta_teste)
+    saida = Path(saida) if saida is not None else pasta_teste
+    saida.mkdir(parents=True, exist_ok=True)
     cal = json.loads((pasta_cal / "calibration.json").read_text(encoding="utf-8"))
     run_cal = json.loads((pasta_cal / "run.json").read_text(encoding="utf-8"))
     run_teste = json.loads((pasta_teste / "run.json").read_text(encoding="utf-8"))
@@ -221,7 +231,8 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
         }
 
     # --- Teste: episódios de SYN Flood ----------------------------------------------------
-    episodios = read_labels(run_teste["rotulos"]) if run_teste.get("rotulos") else []
+    rotulos = rotulos or run_teste.get("rotulos")
+    episodios = read_labels(rotulos) if rotulos else []
     tolerancia = tolerancia_da_execucao(run_teste)  # D38: mesmas janelas benignas da avaliação
     rot = rotular(
         episodios,
@@ -235,7 +246,10 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
     retratos = pd.read_csv(pasta_teste / "snapshots.csv")
     retratos["benigna"] = [bool(rot.benigna[j]) if 0 <= j < rot.n else False for j in retratos["janela"]]
     fluxos_teste = ler_fluxos(pasta_teste)
-    syn_floods = [e for e in episodios if "lambda_A" in e.parametros]
+    # Laboratório: λ_A do gerador. Datasets reais (D76): classes listadas em
+    # avaliacao.classes_syn_flood, com λ̂_A estimado na captura.
+    classes_sf = set(((run_teste.get("config") or {}).get("avaliacao") or {}).get("classes_syn_flood") or [])
+    syn_floods = [e for e in episodios if "lambda_A" in e.parametros or (e.classe in classes_sf and e.chave_tipo == "servidor")]
 
     k_max = int(retratos["N_s"].max()) + 1 if not retratos.empty else 1
     ks = np.arange(0, k_max + 1)
@@ -243,16 +257,21 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
     for e in syn_floods:
         srv = _alvo(e)
         a = por_servidor.get(srv, {}).get("a", math.nan)
-        lam = float(e.parametros["lambda_A"])
-        b = b_ataque(lam, tau)
-        faixa = ipaddress.ip_network(e.parametros.get("faixa_forjada", "10.99.0.0/16"))
-        ataque = fluxos_teste[
-            fluxos_teste["t_primeiro_syn"].between(e.t_inicio, e.t_fim)
-            & (fluxos_teste["servidor_ip"] == srv)
-            & fluxos_teste["cliente_ip"].map(lambda ip: ipaddress.ip_address(ip) in faixa)
-        ]
         dur = e.t_fim - e.t_inicio
-        lam_hat = len(ataque) / dur if dur > 0 else math.nan
+        no_ep = fluxos_teste["t_primeiro_syn"].between(e.t_inicio, e.t_fim) & (fluxos_teste["servidor_ip"] == srv)
+        if "lambda_A" in e.parametros:  # laboratório: SYNs da faixa forjada
+            lam_origem = "gerador"
+            faixa = ipaddress.ip_network(e.parametros.get("faixa_forjada", "10.99.0.0/16"))
+            ataque = fluxos_teste[no_ep & fluxos_teste["cliente_ip"].map(lambda ip: ipaddress.ip_address(ip) in faixa)]
+            lam_hat = len(ataque) / dur if dur > 0 else math.nan
+            lam = float(e.parametros["lambda_A"])
+        else:  # D76: instâncias novas para o alvo menos o benigno esperado (λ̂_L da calibração)
+            lam_origem = "estimada"
+            ini = fluxos_teste[no_ep & fluxos_teste["t_primeiro_syn"].notna() & (fluxos_teste["midstream"] == 0)]
+            lam_l = float(por_servidor.get(srv, {}).get("lambda_L", math.nan))
+            lam_hat = (len(ini) - lam_l * dur) / dur if dur > 0 else math.nan
+            lam = lam_hat
+        b = b_ataque(lam, tau) if lam == lam and lam >= 0 else math.nan
         est_ret = retratos[
             (retratos["servidor"] == srv) & (retratos["t_fim"] >= e.t_inicio + tau) & (retratos["t_fim"] <= e.t_fim)
         ]["N_s"].to_numpy()
@@ -263,6 +282,7 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
                 "classe": e.classe,
                 "servidor": srv,
                 "lambda_A": lam,
+                "lambda_A_origem": lam_origem,
                 "lambda_A_estimado": lam_hat,
                 "b": b,
                 "b_estimado": lam_hat * tau,
@@ -284,9 +304,10 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
                     "servidor": srv,
                     "k_servidor": k_usado,
                     "lambda_A": lam,
+                    "lambda_A_origem": lam_origem,
                     "k": int(k),
                     "P_FA_teorica": float(p_fa(k, a)) if not math.isnan(a) else None,
-                    "P_D_teorica": float(p_d(k, a, b)) if not math.isnan(a) else None,
+                    "P_D_teorica": float(p_d(k, a, b)) if not (math.isnan(a) or math.isnan(b)) else None,
                     "P_FA_empirica": nb / ben.size if ben.size else None,
                     "P_FA_ic_inf": fl,
                     "P_FA_ic_sup": fh,
@@ -306,11 +327,14 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
                 "servidor": srv,
                 "lambda_A": lam,
                 "k": k_usado,
-                "P_D_teorica": float(p_d(k_usado, a, b)) if not math.isnan(a) else None,
+                "lambda_A_origem": lam_origem,
+                "P_D_teorica": float(p_d(k_usado, a, b)) if not (math.isnan(a) or math.isnan(b)) else None,
                 # D53: a mesma curva com b̂ = λ̂_A · τ_hs (taxa realizada no episódio).
                 "lambda_A_estimado": lam_hat,
                 "P_D_teorica_lambda_estimado": (
-                    float(p_d(k_usado, a, lam_hat * tau)) if not (math.isnan(a) or math.isnan(lam_hat)) else None
+                    float(p_d(k_usado, a, lam_hat * tau))
+                    if not (math.isnan(a) or math.isnan(lam_hat) or lam_hat < 0)
+                    else None
                 ),
                 "P_D_empirica": nd / est_ret.size if est_ret.size else None,
                 "P_D_ic_inf": dl,
@@ -336,7 +360,7 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
             "P_FA_teorica": float(p_fa(k_s, a_s)) if not math.isnan(a_s) else None,
         }
 
-    figs = pasta_teste / "figures"
+    figs = saida / "figures"
     if figuras:
         from tcpmon.analytic.figuras import gerar_figuras
 
@@ -345,6 +369,7 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
     resultado = {
         "calibracao": str(pasta_cal),
         "teste": str(pasta_teste),
+        "rotulos": str(rotulos) if rotulos else None,
         "tau_hs_s": tau,
         "tolerancia_rotulo_s": tolerancia,
         "alfa": alfa,
@@ -357,8 +382,8 @@ def validar_modelo(pasta_cal: Path, pasta_teste: Path, figuras: bool = True) -> 
         "pd_no_k_escolhido": pd_taxa,
         "figuras": sorted(p.name for p in figs.glob("*.png")) if figuras else [],
     }
-    pd.DataFrame(curvas).to_csv(pasta_teste / "curvas_roc.csv", index=False)
-    pd.DataFrame(pd_taxa).to_csv(pasta_teste / "pd_vs_taxa.csv", index=False)
-    arq = pasta_teste / "analytic.json"
+    pd.DataFrame(curvas).to_csv(saida / "curvas_roc.csv", index=False)
+    pd.DataFrame(pd_taxa).to_csv(saida / "pd_vs_taxa.csv", index=False)
+    arq = saida / "analytic.json"
     arq.write_text(json.dumps(_limpo(resultado), indent=2, ensure_ascii=False))
     return arq

@@ -970,3 +970,38 @@ com um comando (`experiments/run.py --config …`). Sem violação de inclusão 
 2. Validação analítica no CIC-DDoS2019: estimar λ̂_A pela captura (SYNs do atacante ao alvo) e
    comparar com o modelo, ou deixar a validação analítica só para o laboratório?
 
+### D76 — Recorte de rajada e validação analítica com λ̂_A nos dados reais **[equipe]**
+2026-11-27 · fase 9 · decidida (D75) · implementação aberta para revisão
+
+Decisões da equipe: o resultado principal usa o episódio oficial do SYN Flood do CIC-DDoS2019
+(11:28–17:35) e, à parte, analisa-se o trecho em que o ataque aparece na captura; a validação
+analítica nos dados reais usa λ̂_A estimado na captura.
+
+Implementação:
+- `tcpmon recorte` grava **outro** `labels.csv` (os rótulos oficiais não mudam). O episódio passa
+  a cobrir só a rajada, e as partes antes e depois dela viram `synflood_fora_da_rajada`, fora da
+  conta.
+- Rajada: instâncias novas (iniciadas por SYN, sem `midstream`) para o servidor alvo, contadas em
+  intervalos de `bin_s` (60 s no YAML) a partir do início do episódio. Limiar = maior contagem por
+  intervalo para esse servidor na **calibração** (só benigno). A rajada é a primeira sequência
+  contínua de intervalos acima do limiar dentro do episódio. (Correção: a primeira versão exigia
+  que ela começasse no primeiro intervalo; no CIC-DDoS2019 o ataque começa um minuto depois do
+  horário da agenda, com 3 instâncias novas em 11:28 e 441 791 em 11:29, contra limiar 11, e o
+  recorte saía vazio.)
+- `experiments/run.py` (com `experimento.recorte`) roda a avaliação sobre o recorte em
+  `eval-…/recorte_rajada/` e a validação analítica em `<C3>/recorte_rajada/`.
+- Validação analítica: episódios das classes em `avaliacao.classes_syn_flood` com chave
+  `servidor` entram mesmo sem λ_A do gerador. λ̂_A = (instâncias novas para o alvo no episódio −
+  λ̂_L · duração) / duração, com λ̂_L da calibração; b = λ̂_A · τ_hs. Os arquivos marcam
+  `lambda_A_origem = estimada` e as figuras dizem "λ̂_A estimada". No laboratório nada muda
+  (`lambda_A_origem = gerador`).
+
+**Resultado (2026-11-28, commit 842e8d3):** rajada de 11:29 a 11:38 (limiar da calibração: 11
+instâncias novas por minuto; na rajada, de 441 mil a 642 mil por minuto). Nas 541 janelas da
+rajada: P_D = 0 (C1), 0,889 (C2) e 0,967 (C3); latência de 81 s (C2) e 18 s (C3); McNemar
+C2 × C3: ΔP_D = 0,078 [0,056; 0,103]. Validação analítica: no recorte, λ̂_A ≈ 9 305 SYN/s, P_D
+teórica e empírica = 1 com k = 0, mas a média dos retratos estacionários (cerca de 363 mil
+pendentes) é 62% de â + b (cerca de 586 mil). No episódio oficial, λ̂_A médio = 228 SYN/s dá P_D
+teórica 1 contra 0,068 medida: o modelo supõe taxa constante, e o ataque na captura é uma rajada
+curta. As duas divergências são reportadas como estão.
+

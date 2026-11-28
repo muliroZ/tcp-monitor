@@ -71,6 +71,8 @@ class AvaliacaoCfg:
     sensibilidade_tolerancia_s: tuple[float, ...]
     # D64: classes de episódio cujas janelas não são positivas nem benignas.
     classes_fora_da_conta: tuple[str, ...] = ()
+    # D76: classes de SYN Flood dos datasets reais (validação analítica com λ̂_A estimado).
+    classes_syn_flood: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -278,6 +280,7 @@ def from_dict(raw: dict[str, Any], origem: str | None = None) -> Config:
             _num({"v": v}, "v", 0.0, nome="avaliacao.sensibilidade_tolerancia_s") for v in sens
         ),
         classes_fora_da_conta=_lista_texto(av.get("classes_fora_da_conta"), "avaliacao.classes_fora_da_conta"),
+        classes_syn_flood=_lista_texto(av.get("classes_syn_flood"), "avaliacao.classes_syn_flood"),
     )
     tau_origem = raw.get("tau_hs_origem")
     if tau_origem is not None and not isinstance(tau_origem, str):
