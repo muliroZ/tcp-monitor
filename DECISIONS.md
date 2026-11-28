@@ -996,3 +996,12 @@ Implementação:
   `lambda_A_origem = estimada` e as figuras dizem "λ̂_A estimada". No laboratório nada muda
   (`lambda_A_origem = gerador`).
 
+**Resultado (2026-11-28, commit 842e8d3):** rajada de 11:29 a 11:38 (limiar da calibração: 11
+instâncias novas por minuto; na rajada, de 441 mil a 642 mil por minuto). Nas 541 janelas da
+rajada: P_D = 0 (C1), 0,889 (C2) e 0,967 (C3); latência de 81 s (C2) e 18 s (C3); McNemar
+C2 × C3: ΔP_D = 0,078 [0,056; 0,103]. Validação analítica: no recorte, λ̂_A ≈ 9 305 SYN/s, P_D
+teórica e empírica = 1 com k = 0, mas a média dos retratos estacionários (cerca de 363 mil
+pendentes) é 62% de â + b (cerca de 586 mil). No episódio oficial, λ̂_A médio = 228 SYN/s dá P_D
+teórica 1 contra 0,068 medida: o modelo supõe taxa constante, e o ataque na captura é uma rajada
+curta. As duas divergências são reportadas como estão.
+
