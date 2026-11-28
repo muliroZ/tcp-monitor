@@ -231,6 +231,16 @@ camadas: [1, 2]
 janela_s: 5.0
 ```
 
+Uma captura dividida em vários arquivos é passada como pasta (lida em ordem numérica pelo
+sufixo do nome), e `entrada.inicio` / `entrada.fim` recortam um intervalo (D73):
+
+```bash
+tcpmon calibrate --config configs/experiments/cicddos2019.yaml --pcap data/pcaps/PCAP-03-11 \
+    --inicio "" --fim 2018-11-03T09:42:00-03:00
+python experiments/run.py --config configs/experiments/cicids2017.yaml    # segunda → sexta
+python experiments/run.py --config configs/experiments/cicddos2019.yaml   # 3/11/2018
+```
+
 Chaves para os datasets reais (fase 9):
 
 ```yaml

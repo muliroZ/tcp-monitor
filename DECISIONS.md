@@ -306,6 +306,27 @@ Também nos pcaps:
 - Numeração dos arquivos do CIC-DDoS2019: `_0`, `_01`, … `_0249`; a ordem numérica não é a
   alfabética.
 
+### D74 — CIC-DDoS2019, "First Day": verificações no pcap **[equipe]**
+2026-11-27 · fase 9 · decidida · servidores confirmados pela equipe
+
+`PCAP-03-11.zip`: 146 arquivos `SAT-03-11-2018_N` (29 GB extraídos; nomes e tamanhos conferidos
+com a lista do zip, sem MD5 publicado). Achados:
+- Data: 3/11/2018. Fuso: UTC−3 (ADT; o horário de verão em New Brunswick terminou em 4/11/2018).
+  A captura vai de 9:18:16 a 17:36:41. O início de cada fase de ataque bate com a agenda: NetBIOS
+  10:01, LDAP 10:21, MSSQL 10:34, UDP 10:54, UDP-Lag 11:14, SYN 11:28–11:30.
+- Alvo de todos os ataques na captura: **192.168.50.4**, vindos de **172.16.0.5**. A página lista o
+  servidor deste dia como 192.168.50.1, mas esse IP não aparece no tráfego; `agregador.servidores
+  = [192.168.50.4]`.
+- 172.16.0.5 é também a origem do tráfego benigno que chega ao servidor (886 SYN entre 9:18 e
+  10:01): o NAT mistura clientes benignos e atacante. A chave dos ataques é o servidor, então isso
+  não afeta o casamento dos alertas.
+- PortMap (9:43–9:51): sem tráfego de ataque visível para o alvo. Fica rotulado com classe
+  própria, como os demais (D62); é UDP, e o monitor só vê TCP.
+- SYN Flood: denso entre 11:28 e cerca de 11:36 (cerca de 25 mil SYN/s e 8 mil conexões novas por
+  segundo); depois disso, os arquivos `_0144` e `_0145` cobrem de 12:37 a 17:36 com pouco tráfego.
+- Calibração (D61): de 9:18:16 até 9:42:00, 60 s antes do primeiro ataque (tolerância da D38),
+  cerca de 24 min. Teste: de 9:42:00 até o fim da captura.
+
 ### Pendências que continuam com a equipe
 
 - Baixar o "First Day" do CIC-DDoS2019 (D69).
@@ -894,4 +915,24 @@ primeira instância começa pela resposta e vai para ⊥ (`SEM_HANDSHAKE`, `SYNA
 caem nas janelas do PortScan e contam para a P_D dele. O pcap não é alterado (regra 7) e a
 ordem não é corrigida (guia: processar na ordem do arquivo). O efeito vai para o artigo como
 artefato da captura.
+
+### D73 — Captura em vários arquivos e recorte no tempo
+2026-11-27 · fase 9 · aberta
+
+- `entrada.pcap` (e `--pcap`) aceita uma pasta: os arquivos são lidos em sequência, na ordem do
+  número no fim do nome (`_0`, `_01`, `_02`, …, `_010`; a ordem alfabética seria errada), como
+  uma captura só. Inversões de timestamp entre o fim de um arquivo e o início do seguinte são
+  contadas como as outras. Arquivos ocultos são ignorados.
+- `entrada.inicio` e `entrada.fim` (ISO 8601 com fuso, ou segundos desde a época) recortam a
+  captura em [início, fim). Quadros antes do início são pulados e contados à parte; a leitura
+  para no primeiro quadro com ts ≥ fim (um quadro anterior ao fim que venha depois, por inversão,
+  fica de fora). t0 e a carência G contam a partir do primeiro quadro do recorte. `--inicio` e
+  `--fim` sobrescrevem a configuração; texto vazio remove o limite.
+- `experiments/run.py` passa `experimento.calibracao_inicio/fim` para a calibração.
+- `run.json` grava o recorte, o número de arquivos, o SHA-256 de cada um e um SHA-256 único da
+  lista `nome:hash`. O recorte acontece na leitura, igual para C1, C2 e C3 (regra 2).
+- Memória: o motor passou a internar as strings de IP e a reaproveitar as tuplas da chave; as
+  saídas do laboratório são idênticas. Num ensaio de 5 min do SYN Flood (11 milhões de pacotes),
+  a C1 chegou a 2 milhões de fluxos vivos e 3,75 GB, porque cada conexão pendente fica até a
+  inatividade (3 600 s; D20).
 
