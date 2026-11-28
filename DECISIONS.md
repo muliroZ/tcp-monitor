@@ -970,3 +970,25 @@ com um comando (`experiments/run.py --config …`). Sem violação de inclusão 
 2. Validação analítica no CIC-DDoS2019: estimar λ̂_A pela captura (SYNs do atacante ao alvo) e
    comparar com o modelo, ou deixar a validação analítica só para o laboratório?
 
+### D76 — Recorte de rajada e validação analítica com λ̂_A nos dados reais **[equipe]**
+2026-11-27 · fase 9 · decidida (D75) · implementação aberta para revisão
+
+Decisões da equipe: o resultado principal usa o episódio oficial do SYN Flood do CIC-DDoS2019
+(11:28–17:35) e, à parte, analisa-se o trecho em que o ataque aparece na captura; a validação
+analítica nos dados reais usa λ̂_A estimado na captura.
+
+Implementação:
+- `tcpmon recorte` grava **outro** `labels.csv` (os rótulos oficiais não mudam). O episódio vai do
+  início até o fim da rajada, e o resto vira `synflood_apos_rajada`, fora da conta.
+- Fim da rajada: instâncias novas (iniciadas por SYN, sem `midstream`) para o servidor alvo,
+  contadas em intervalos de `bin_s` (60 s no YAML) a partir do início do episódio. Limiar = maior
+  contagem por intervalo para esse servidor na **calibração** (só benigno). A rajada é a sequência
+  de intervalos acima do limiar que começa no primeiro; o fim é o fim do último deles.
+- `experiments/run.py` (com `experimento.recorte`) roda a avaliação sobre o recorte em
+  `eval-…/recorte_rajada/` e a validação analítica em `<C3>/recorte_rajada/`.
+- Validação analítica: episódios das classes em `avaliacao.classes_syn_flood` com chave
+  `servidor` entram mesmo sem λ_A do gerador. λ̂_A = (instâncias novas para o alvo no episódio −
+  λ̂_L · duração) / duração, com λ̂_L da calibração; b = λ̂_A · τ_hs. Os arquivos marcam
+  `lambda_A_origem = estimada` e as figuras dizem "λ̂_A estimada". No laboratório nada muda
+  (`lambda_A_origem = gerador`).
+

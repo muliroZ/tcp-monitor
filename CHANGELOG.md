@@ -10,6 +10,8 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/).
   o mesmo início (antes, uma sobrescrevia a outra e apareciam violações falsas).
 
 ### Adicionado
+- D76: `tcpmon recorte` (rajada do episódio, rótulos à parte), validação analítica com λ̂_A
+  estimado nos datasets reais (`avaliacao.classes_syn_flood`), `tcpmon analytic --rotulos --saida`.
 - D73: captura em vários arquivos (pasta lida em ordem numérica) e recorte no tempo
   (`entrada.inicio`, `entrada.fim`, `--inicio`, `--fim`); `configs/experiments/cicddos2019.yaml`.
 - D38 (D56): tolerância de rótulo na avaliação e na validação analítica

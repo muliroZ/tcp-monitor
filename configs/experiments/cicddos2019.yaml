@@ -12,7 +12,8 @@ agregador:
 avaliacao:
   tolerancia_rotulo_s: 60.0                            # D38
   sensibilidade_tolerancia_s: [0.0, 300.0]             # D38
-  classes_fora_da_conta: []
+  classes_fora_da_conta: [synflood_apos_rajada]        # D76: só existe nos rótulos do recorte
+  classes_syn_flood: [synflood]                        # D76
 saida: results/cicddos2019/
 experimento:
   calibracao_pcap: data/pcaps/PCAP-03-11
@@ -20,3 +21,6 @@ experimento:
   agenda: configs/rotulos/cicddos2019_dia1_agenda.csv
   agenda_dias: ["2018-11-03"]
   configuracoes: [[1], [1, 2], [1, 2, 3]]
+  recorte:                                             # D76: análise à parte da rajada do SYN Flood
+    classe: synflood
+    bin_s: 60.0

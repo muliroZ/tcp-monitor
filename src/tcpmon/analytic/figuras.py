@@ -80,7 +80,9 @@ def roc(pasta: Path, curvas: pd.DataFrame) -> None:
         ax.set_ylim(-0.02, 1.02)
         n_est = int(g["n_estacionarios"].iloc[0])
         n_ben = int(g["n_benignos"].iloc[0])
-        _estilo(ax, f"ROC — SYN Flood λ_A = {lam:g}/s", "P_FA", "P_D")
+        estimada = "lambda_A_origem" in g and (g["lambda_A_origem"] == "estimada").any()
+        rot_lam = f"λ̂_A = {lam:.3g}/s (estimada)" if estimada else f"λ_A = {lam:g}/s"
+        _estilo(ax, f"ROC — SYN Flood {rot_lam}", "P_FA", "P_D")
         ax.text(0.98, 0.30, f"servidor {srv}, episódio {ep}\n{n_est} retratos estacionários\n{n_ben} retratos benignos",
                 transform=ax.transAxes, ha="right", va="bottom", color=TEXTO_2, fontsize=8)
         ax.legend(frameon=False, loc="lower right")
@@ -108,7 +110,9 @@ def _pd_vs_taxa(pasta: Path, pdt: pd.DataFrame, srv: str, k_usado: int, varios: 
                 markeredgecolor="white", capsize=2, elinewidth=1, label="empírica (IC 95%)")
     ax.set_xscale("log")
     ax.set_ylim(-0.02, 1.02)
-    _estilo(ax, f"P_D em função de λ_A (k = {k_usado})", f"λ_A (SYN/s, escala log) — servidor {srv}, retratos estacionários", "P_D")
+    estimada = "lambda_A_origem" in pdt and (pdt["lambda_A_origem"] == "estimada").any()
+    eixo = "λ̂_A estimada" if estimada else "λ_A"
+    _estilo(ax, f"P_D em função de {eixo} (k = {k_usado})", f"{eixo} (SYN/s, escala log) — servidor {srv}, retratos estacionários", "P_D")
     ax.legend(frameon=False, loc="lower right")
     _salvar(fig, pasta / f"pd_vs_taxa{_sufixo(srv, varios)}.png")
 
