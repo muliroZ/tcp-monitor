@@ -3,17 +3,18 @@
 O resultado principal usa sempre o episódio oficial. Este módulo produz, **à parte**, um
 segundo conjunto de rótulos para uma análise complementar:
 
-- o episódio (classe escolhida, chave ``servidor``) vai do seu início até o fim da rajada;
-- o resto do episódio oficial vira um episódio da classe ``<classe>_apos_rajada``, que a
-  avaliação deixa fora da conta (não é positivo nem benigno);
+- o episódio (classe escolhida, chave ``servidor``) passa a cobrir só a rajada;
+- as partes do episódio oficial antes e depois da rajada viram episódios da classe
+  ``<classe>_fora_da_rajada``, que a avaliação deixa fora da conta (não são positivos nem
+  benignos);
 - os demais episódios ficam como estão.
 
-**Fim da rajada:** contam-se, em intervalos de ``bin_s`` segundos a partir do início do
+**Rajada:** contam-se, em intervalos de ``bin_s`` segundos a partir do início do
 episódio, as instâncias novas (iniciadas por SYN) para o servidor alvo no teste. O limiar é
 o maior número de instâncias novas para esse servidor num intervalo de mesmo tamanho na
-calibração (só tráfego benigno; nada do teste entra no limiar). A rajada é a sequência de
-intervalos acima do limiar que começa no primeiro intervalo do episódio; o fim é o fim do
-último intervalo dela (limitado ao fim do episódio).
+calibração (só tráfego benigno; nada do teste entra no limiar). A rajada é a primeira
+sequência contínua de intervalos acima do limiar dentro do episódio; ela vai do início do
+primeiro intervalo ao fim do último (limitado ao fim do episódio).
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ import pandas as pd
 from tcpmon.flows.key import endpoint_ip
 from tcpmon.io.labels import Episodio, read_labels, write_labels
 
-SUFIXO_RESTO = "_apos_rajada"
+SUFIXO_RESTO = "_fora_da_rajada"
 
 
 def _iniciados(pasta: Path, servidor: str) -> np.ndarray:
@@ -47,17 +48,19 @@ def limiar_da_calibracao(pasta_cal: Path, servidor: str, bin_s: float) -> int:
     return int(np.bincount(idx).max())
 
 
-def fim_da_rajada(pasta_teste: Path, ep: Episodio, limiar: int, bin_s: float) -> float | None:
-    """Fim da rajada do episódio, ou None se o primeiro intervalo não passa do limiar."""
+def rajada(pasta_teste: Path, ep: Episodio, limiar: int, bin_s: float) -> tuple[float, float] | None:
+    """(início, fim) da rajada do episódio, ou None se nenhum intervalo passa do limiar."""
     t = _iniciados(pasta_teste, ep.chave_valor)
     t = t[(t >= ep.t_inicio) & (t <= ep.t_fim)]
     n_bins = max(1, math.ceil((ep.t_fim - ep.t_inicio) / bin_s))
     cont = np.bincount(np.floor((t - ep.t_inicio) / bin_s).astype(int), minlength=n_bins)[:n_bins]
     acima = cont > limiar
-    if not acima[0]:
+    if not acima.any():
         return None
-    ultimo = int(np.argmin(acima)) - 1 if not acima.all() else n_bins - 1
-    return min(ep.t_fim, ep.t_inicio + (ultimo + 1) * bin_s)
+    primeiro = int(np.argmax(acima))
+    resto = acima[primeiro:]
+    ultimo = primeiro + (int(np.argmin(resto)) - 1 if not resto.all() else resto.size - 1)
+    return ep.t_inicio + primeiro * bin_s, min(ep.t_fim, ep.t_inicio + (ultimo + 1) * bin_s)
 
 
 def recortar(
@@ -71,19 +74,23 @@ def recortar(
             novos.append(e)
             continue
         limiar = limiar_da_calibracao(pasta_cal, e.chave_valor, bin_s)
-        fim = fim_da_rajada(pasta_teste, e, limiar, bin_s)
+        r = rajada(pasta_teste, e, limiar, bin_s)
         resumo.append(
             {"episodio": e.episodio, "servidor": e.chave_valor, "bin_s": bin_s, "limiar_calibracao": limiar,
-             "t_inicio": e.t_inicio, "fim_oficial": e.t_fim, "fim_rajada": fim}
+             "inicio_oficial": e.t_inicio, "fim_oficial": e.t_fim,
+             "inicio_rajada": r[0] if r else None, "fim_rajada": r[1] if r else None}
         )
-        if fim is None or fim >= e.t_fim:
+        if r is None:
             novos.append(e)
             continue
-        params = {**e.parametros, "recorte": "rajada (D76)", "fim_oficial": e.t_fim}
-        novos.append(replace(e, t_fim=fim, parametros=params))
-        novos.append(
-            Episodio(f"{e.episodio}_resto", classe + SUFIXO_RESTO, fim, e.t_fim, e.chave_tipo, e.chave_valor,
-                     {"recorte": "resto do episódio oficial depois da rajada (D76)", "episodio_oficial": e.episodio})
-        )
+        ini, fim = r
+        params = {**e.parametros, "recorte": "rajada (D76)", "inicio_oficial": e.t_inicio, "fim_oficial": e.t_fim}
+        novos.append(replace(e, t_inicio=ini, t_fim=fim, parametros=params))
+        for nome, a, b in (("antes", e.t_inicio, ini), ("depois", fim, e.t_fim)):
+            if b > a:
+                novos.append(
+                    Episodio(f"{e.episodio}_{nome}", classe + SUFIXO_RESTO, a, b, e.chave_tipo, e.chave_valor,
+                             {"recorte": f"parte do episódio oficial {nome} da rajada (D76)", "episodio_oficial": e.episodio})
+                )
     write_labels(saida, novos)
     return resumo
