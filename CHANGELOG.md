@@ -10,6 +10,8 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/).
   o mesmo início (antes, uma sobrescrevia a outra e apareciam violações falsas).
 
 ### Adicionado
+- D73: captura em vários arquivos (pasta lida em ordem numérica) e recorte no tempo
+  (`entrada.inicio`, `entrada.fim`, `--inicio`, `--fim`); `configs/experiments/cicddos2019.yaml`.
 - D38 (D56): tolerância de rótulo na avaliação e na validação analítica
   (`avaliacao.tolerancia_rotulo_s`), `tcpmon eval --tolerancia` e análise de sensibilidade em
   `experiments/run.py` (`avaliacao.sensibilidade_tolerancia_s`).
@@ -27,6 +29,12 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/).
   para datasets reais; `tcpmon agenda --dias` e `--estrito`.
 
 ### Alterado
+- D75: primeiros resultados no CIC-IDS2017 (segunda → sexta) e no CIC-DDoS2019 (3/11/2018), com
+  o pipeline completo; observações e perguntas abertas.
+- Menos memória por fluxo no motor (strings de IP internadas, tuplas reaproveitadas); saídas
+  idênticas.
+- D74: verificações no "First Day" do CIC-DDoS2019 (data, fuso, alvo 192.168.50.4), decididas pela
+  equipe.
 - D63 resolvida (atacante externo como 172.16.0.1); D68 (varreduras sem pacotes na captura fora
   da conta) e D69 (o pacote baixado do CIC-DDoS2019 é o "Second Day"), decididas pela equipe.
 - D58, D60–D65 decididas pela equipe (levantamento das páginas oficiais, download, calibração do

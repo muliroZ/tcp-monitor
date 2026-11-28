@@ -12,13 +12,13 @@ from tcpmon import __version__
 
 def _cmd_symbols(args: argparse.Namespace) -> int:
     from tcpmon.flows.table import FlowTable
-    from tcpmon.io.pcap_reader import ReadCounters, read_packets
+    from tcpmon.io.pcap_reader import ReadCounters, read_captura
 
     tabela = FlowTable(carencia_s=args.carencia)
     ordem: list = []
     sequencias: dict = {}
     cont = ReadCounters()
-    for pkt in read_packets(args.pcap, cont):
+    for pkt in read_captura(args.pcap, cont):
         tabela.observar_tempo(pkt.ts)
         key, fluxo = tabela.buscar(pkt)
         if fluxo is None:
@@ -55,7 +55,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     from tcpmon.config import load_config
     from tcpmon.pipeline import carregar_calibracao, executar
 
-    cfg = load_config(args.config)
+    cfg = _com_intervalo(load_config(args.config), args)
     cal_path = args.calibracao or cfg.agregador.calibracao
     calibracao = None
     if cal_path:
@@ -72,11 +72,36 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _com_intervalo(cfg, args: argparse.Namespace):
+    """D73: --inicio/--fim sobrescrevem entrada.inicio/entrada.fim (ISO 8601 com fuso ou época;
+    texto vazio remove o limite)."""
+    import copy
+
+    from tcpmon.config import from_dict
+
+    if args.inicio is None and args.fim is None:
+        return cfg
+    raw = copy.deepcopy(cfg.raw)
+    for chave in ("inicio", "fim"):
+        valor = getattr(args, chave)
+        if valor is None:
+            continue
+        if valor == "":  # texto vazio = sem limite (não herda o valor da configuração)
+            raw["entrada"][chave] = None
+            continue
+        try:
+            valor = float(valor)
+        except ValueError:
+            pass
+        raw["entrada"][chave] = valor
+    return from_dict(raw, origem=cfg.origem)
+
+
 def _cmd_calibrate(args: argparse.Namespace) -> int:
     from tcpmon.calibracao import calibrar
     from tcpmon.config import load_config
 
-    cfg = load_config(args.config)
+    cfg = _com_intervalo(load_config(args.config), args)
     print(calibrar(cfg, args.pcap, saida_base=args.saida))
     return 0
 
@@ -118,7 +143,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="comando", metavar="<comando>")
 
     s = sub.add_parser("symbols", help="imprime a sequência de símbolos de cada fluxo (depuração)")
-    s.add_argument("--pcap", required=True, help="arquivo pcap ou pcapng")
+    s.add_argument("--pcap", required=True, help="arquivo pcap ou pcapng, ou pasta de arquivos em sequência")
     s.add_argument(
         "--carencia",
         type=float,
@@ -130,8 +155,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     c = sub.add_parser("calibrate", help="calcula k e k_scan sobre o pcap de calibração (só benigno)")
     c.add_argument("--config", required=True, help="arquivo YAML da configuração")
-    c.add_argument("--pcap", required=True, help="pcap de calibração (apenas tráfego benigno)")
+    c.add_argument("--pcap", required=True, help="pcap de calibração (apenas tráfego benigno), arquivo ou pasta")
     c.add_argument("--saida", default=None, help="sobrescreve a pasta base de saída")
+    c.add_argument("--inicio", default=None, help="sobrescreve entrada.inicio (ISO 8601 com fuso ou época; D73)")
+    c.add_argument("--fim", default=None, help="sobrescreve entrada.fim (ISO 8601 com fuso ou época; D73)")
     c.set_defaults(func=_cmd_calibrate)
 
     r = sub.add_parser("run", help="executa as camadas configuradas e grava results/<run_id>/")
@@ -140,6 +167,8 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--pcap", default=None, help="sobrescreve entrada.pcap da configuração")
     r.add_argument("--camadas", default=None, help="sobrescreve 'camadas' (ex.: 1 ou 1,2 ou 1,2,3)")
     r.add_argument("--saida", default=None, help="sobrescreve a pasta base de saída")
+    r.add_argument("--inicio", default=None, help="sobrescreve entrada.inicio (ISO 8601 com fuso ou época; D73)")
+    r.add_argument("--fim", default=None, help="sobrescreve entrada.fim (ISO 8601 com fuso ou época; D73)")
     r.set_defaults(func=_cmd_run)
 
     e = sub.add_parser("eval", help="gera métricas, intervalos e testes estatísticos de execuções")

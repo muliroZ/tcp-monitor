@@ -27,7 +27,7 @@ from tcpmon.config import Config, config_hash, tau_hs_de_synack_retries
 from tcpmon.engine import Engine, ParametrosEngine
 from tcpmon.flows.key import format_endpoint
 from tcpmon.flows.table import FlowInstance
-from tcpmon.io.pcap_reader import ReadCounters, read_packets, sha256_arquivo
+from tcpmon.io.pcap_reader import ReadCounters, read_captura, sha256_captura
 
 log = logging.getLogger(__name__)
 
@@ -223,7 +223,8 @@ def executar(
     params = ParametrosEngine.de_config(
         cfg, tau_hs_s=tau, camadas=camadas, k=k, k_scan=k_scan, coletar_retratos=coletar_retratos
     )
-    pcap_sha = sha256_arquivo(pcap)
+    pcap_hash = sha256_captura(pcap)
+    pcap_sha = pcap_hash["sha256"]
     efetiva = {
         "config": cfg.raw,
         "camadas": list(camadas),
@@ -232,6 +233,7 @@ def executar(
         "k_scan": k_scan,
         "servidores": list(servidores) if servidores else None,
         "pcap_sha256": pcap_sha,
+        "intervalo": [cfg.entrada.inicio, cfg.entrada.fim],
         "coletar_retratos": coletar_retratos,
     }
     run_id, pasta = _pasta_run(Path(saida_base or cfg.saida), efetiva, sufixo)
@@ -242,7 +244,7 @@ def executar(
     cont = ReadCounters()
     inicio = time.perf_counter()
     try:
-        for pkt in read_packets(pcap, cont):
+        for pkt in read_captura(pcap, cont, cfg.entrada.inicio, cfg.entrada.fim):
             if engine.t0 is None:
                 engine.iniciar(cont.primeiro_ts)
             engine.processar(pkt)
@@ -277,7 +279,7 @@ def executar(
         "k_scan": k_scan,
         "k_origem": origem_k if 3 in camadas else None,
         "servidores": list(servidores) if servidores else None,
-        "pcap": {"caminho": str(pcap), "sha256": pcap_sha},
+        "pcap": {"caminho": str(pcap), **pcap_hash, "inicio": cfg.entrada.inicio, "fim": cfg.entrada.fim},
         "metadado_laboratorio": {
             "sysctls_servidor": meta.get("sysctls_servidor"),
             "plano_sha256": meta.get("plano_sha256"),

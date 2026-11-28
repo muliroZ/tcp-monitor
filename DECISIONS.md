@@ -306,6 +306,27 @@ Também nos pcaps:
 - Numeração dos arquivos do CIC-DDoS2019: `_0`, `_01`, … `_0249`; a ordem numérica não é a
   alfabética.
 
+### D74 — CIC-DDoS2019, "First Day": verificações no pcap **[equipe]**
+2026-11-27 · fase 9 · decidida · servidores confirmados pela equipe
+
+`PCAP-03-11.zip`: 146 arquivos `SAT-03-11-2018_N` (29 GB extraídos; nomes e tamanhos conferidos
+com a lista do zip, sem MD5 publicado). Achados:
+- Data: 3/11/2018. Fuso: UTC−3 (ADT; o horário de verão em New Brunswick terminou em 4/11/2018).
+  A captura vai de 9:18:16 a 17:36:41. O início de cada fase de ataque bate com a agenda: NetBIOS
+  10:01, LDAP 10:21, MSSQL 10:34, UDP 10:54, UDP-Lag 11:14, SYN 11:28–11:30.
+- Alvo de todos os ataques na captura: **192.168.50.4**, vindos de **172.16.0.5**. A página lista o
+  servidor deste dia como 192.168.50.1, mas esse IP não aparece no tráfego; `agregador.servidores
+  = [192.168.50.4]`.
+- 172.16.0.5 é também a origem do tráfego benigno que chega ao servidor (886 SYN entre 9:18 e
+  10:01): o NAT mistura clientes benignos e atacante. A chave dos ataques é o servidor, então isso
+  não afeta o casamento dos alertas.
+- PortMap (9:43–9:51): sem tráfego de ataque visível para o alvo. Fica rotulado com classe
+  própria, como os demais (D62); é UDP, e o monitor só vê TCP.
+- SYN Flood: denso entre 11:28 e cerca de 11:36 (cerca de 25 mil SYN/s e 8 mil conexões novas por
+  segundo); depois disso, os arquivos `_0144` e `_0145` cobrem de 12:37 a 17:36 com pouco tráfego.
+- Calibração (D61): de 9:18:16 até 9:42:00, 60 s antes do primeiro ataque (tolerância da D38),
+  cerca de 24 min. Teste: de 9:42:00 até o fim da captura.
+
 ### Pendências que continuam com a equipe
 
 - Baixar o "First Day" do CIC-DDoS2019 (D69).
@@ -894,4 +915,58 @@ primeira instância começa pela resposta e vai para ⊥ (`SEM_HANDSHAKE`, `SYNA
 caem nas janelas do PortScan e contam para a P_D dele. O pcap não é alterado (regra 7) e a
 ordem não é corrigida (guia: processar na ordem do arquivo). O efeito vai para o artigo como
 artefato da captura.
+
+### D73 — Captura em vários arquivos e recorte no tempo
+2026-11-27 · fase 9 · aberta
+
+- `entrada.pcap` (e `--pcap`) aceita uma pasta: os arquivos são lidos em sequência, na ordem do
+  número no fim do nome (`_0`, `_01`, `_02`, …, `_010`; a ordem alfabética seria errada), como
+  uma captura só. Inversões de timestamp entre o fim de um arquivo e o início do seguinte são
+  contadas como as outras. Arquivos ocultos são ignorados.
+- `entrada.inicio` e `entrada.fim` (ISO 8601 com fuso, ou segundos desde a época) recortam a
+  captura em [início, fim). Quadros antes do início são pulados e contados à parte; a leitura
+  para no primeiro quadro com ts ≥ fim (um quadro anterior ao fim que venha depois, por inversão,
+  fica de fora). t0 e a carência G contam a partir do primeiro quadro do recorte. `--inicio` e
+  `--fim` sobrescrevem a configuração; texto vazio remove o limite.
+- `experiments/run.py` passa `experimento.calibracao_inicio/fim` para a calibração.
+- `run.json` grava o recorte, o número de arquivos, o SHA-256 de cada um e um SHA-256 único da
+  lista `nome:hash`. O recorte acontece na leitura, igual para C1, C2 e C3 (regra 2).
+- Memória: o motor passou a internar as strings de IP e a reaproveitar as tuplas da chave; as
+  saídas do laboratório são idênticas. Num ensaio de 5 min do SYN Flood (11 milhões de pacotes),
+  a C1 chegou a 2 milhões de fluxos vivos e 3,75 GB, porque cada conexão pendente fica até a
+  inatividade (3 600 s; D20).
+
+### D75 — Primeiros resultados nos datasets reais: observações
+2026-11-27 · fase 9 · aberta · nada foi ajustado; duas perguntas para a equipe
+
+Execuções: `results/cicids2017/` (commit 161abce) e `results/cicddos2019/` (commit e71ef13), cada uma
+com um comando (`experiments/run.py --config …`). Sem violação de inclusão C1 ⊆ C2 ⊆ C3 nos dois.
+
+- **k = 0 nos dois datasets.** Numa rede local o handshake termina em milissegundos, e o retrato no
+  fim da janela quase nunca tem um pendente: â = 0,0043 (192.168.10.50, segunda-feira) e 0,0081
+  (192.168.50.4). A P_FA do agregador no teste confere com a teoria: 0,0069 [0,0043; 0,0112] contra
+  `poisson.sf(0, â)` = 0,0080 no CIC-DDoS2019. A lei de Little confere nos dois (0,00432 × 0,00434;
+  0,0091 × 0,0081). 192.168.10.51 não recebe nenhuma conexão na segunda (λ̂_L = 0).
+- **CIC-IDS2017, falsos alarmes da C1** (442 janelas benignas de 19 421): quase todos
+  `TRANSICAO_INESPERADA`, sobretudo `SYN_VISTO` + `C.ACK` (o SYN-ACK não está na captura) e
+  `FECHADO` + `S.SYNACK` (SYN-ACK retransmitido depois do fecho). São pacotes ausentes ou
+  retransmissões na captura, não ataque; o autômato da camada 1 não tolera perda de pacote.
+- **CIC-DDoS2019, SYN Flood:** o episódio oficial vai de 11:28 a 17:35, mas o ataque na captura
+  dura cerca de 9 min (450 456 SYN entre 11:30 e 11:39; antes disso, desde 11:28). De 11:40 em
+  diante chegam ao alvo cerca de 100 SYN a cada 10 min, no nível do tráfego benigno. Nas janelas
+  do ataque efetivo a detecção da C2 e da C3 é quase total; na média do episódio, P_D = 0,022 (C2)
+  e 0,068 (C3). Os ataques UDP (PortMap, NetBIOS, LDAP, MSSQL, UDP, UDP-Lag) não são TCP e ficam
+  com P_D ≈ 0, como esperado.
+- **Validação analítica do SYN Flood nos dados reais:** não foi feita. O código só trata episódios
+  com λ_A do gerador (`parametros.lambda_A`), que existe só no laboratório.
+- Desempenho: segunda-feira do CIC-IDS2017 (11,7 milhões de pacotes) em 3 min 47 s; sexta (10
+  milhões) em cerca de 3 min por configuração. CIC-DDoS2019 (61 milhões de pacotes TCP e não TCP)
+  em 11–12 min por configuração, com pico de 2,9 milhões de fluxos e 4,2 GB na C1, e 6,4 GB na C2
+  (2,67 milhões de alertas em memória).
+
+**Para a equipe:**
+1. SYN Flood do CIC-DDoS2019: manter o episódio de 11:28 a 17:35 como está (P_D média baixa,
+   explicada no artigo) ou também reportar, à parte, as janelas em que o ataque aparece na captura?
+2. Validação analítica no CIC-DDoS2019: estimar λ̂_A pela captura (SYNs do atacante ao alvo) e
+   comparar com o modelo, ou deixar a validação analítica só para o laboratório?
 
