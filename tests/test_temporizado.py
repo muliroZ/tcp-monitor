@@ -146,3 +146,21 @@ def test_inclusao_por_traco_detecta_violacao():
     assert len(inclusao_por_traco([a], [])) == 1
     assert len(inclusao_por_traco([a], [Rejeitada("k", 0.0, 6.0, "Y", "k#1")])) == 1
     assert inclusao_por_traco([a], [Rejeitada("k", 0.0, 5.0, "Y", "k#1")]) == []
+
+
+def test_inclusao_por_traco_com_mesmo_inicio():
+    """D71: resposta do servidor gravada antes do SYN, com o mesmo timestamp (visto no
+    CIC-IDS2017). As duas configurações rejeitam a primeira instância na hora; o SYN abre outra
+    no mesmo instante, que só a C2 rejeita (mais tarde). A inclusão por traço vale."""
+    from tcpmon.eval.inclusao import inclusao_por_traco, rejeitadas_de_fluxos
+
+    pacotes = [pkt(5.0, SRV, CLI, R), pkt(5.0, CLI, SRV, SYN), relogio_externo(5.0 + TAU)]
+    c1 = rodar(pacotes, camadas=(1,))
+    c2 = rodar(pacotes, camadas=(1, 2))
+    r1, r2 = rejeitadas_de_fluxos(c1.saida.fluxos), rejeitadas_de_fluxos(c2.saida.fluxos)
+    chave = [r for r in r2 if r.motivo == "HANDSHAKE_EXPIRADO"]
+    assert len(chave) == 1 and chave[0].inicio == 5.0 and chave[0].t_alerta == 5.0 + TAU
+    assert {(r.inicio, r.t_alerta) for r in r1 if r.chave == chave[0].chave} == {(5.0, 5.0)}
+    assert inclusao_por_traco(r1, r2) == []
+    # Com a ordem invertida das instâncias da C2, o resultado não muda.
+    assert inclusao_por_traco(r1, list(reversed(r2))) == []
