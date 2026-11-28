@@ -12,7 +12,7 @@ agregador:
 avaliacao:
   tolerancia_rotulo_s: 60.0                            # D38
   sensibilidade_tolerancia_s: [0.0, 300.0]             # D38
-  classes_fora_da_conta: [synflood_apos_rajada]        # D76: só existe nos rótulos do recorte
+  classes_fora_da_conta: [synflood_fora_da_rajada]     # D76: só existe nos rótulos do recorte
   classes_syn_flood: [synflood]                        # D76
 saida: results/cicddos2019/
 experimento:

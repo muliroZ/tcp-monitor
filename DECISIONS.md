@@ -978,12 +978,16 @@ Decisões da equipe: o resultado principal usa o episódio oficial do SYN Flood 
 analítica nos dados reais usa λ̂_A estimado na captura.
 
 Implementação:
-- `tcpmon recorte` grava **outro** `labels.csv` (os rótulos oficiais não mudam). O episódio vai do
-  início até o fim da rajada, e o resto vira `synflood_apos_rajada`, fora da conta.
-- Fim da rajada: instâncias novas (iniciadas por SYN, sem `midstream`) para o servidor alvo,
-  contadas em intervalos de `bin_s` (60 s no YAML) a partir do início do episódio. Limiar = maior
-  contagem por intervalo para esse servidor na **calibração** (só benigno). A rajada é a sequência
-  de intervalos acima do limiar que começa no primeiro; o fim é o fim do último deles.
+- `tcpmon recorte` grava **outro** `labels.csv` (os rótulos oficiais não mudam). O episódio passa
+  a cobrir só a rajada, e as partes antes e depois dela viram `synflood_fora_da_rajada`, fora da
+  conta.
+- Rajada: instâncias novas (iniciadas por SYN, sem `midstream`) para o servidor alvo, contadas em
+  intervalos de `bin_s` (60 s no YAML) a partir do início do episódio. Limiar = maior contagem por
+  intervalo para esse servidor na **calibração** (só benigno). A rajada é a primeira sequência
+  contínua de intervalos acima do limiar dentro do episódio. (Correção: a primeira versão exigia
+  que ela começasse no primeiro intervalo; no CIC-DDoS2019 o ataque começa um minuto depois do
+  horário da agenda, com 3 instâncias novas em 11:28 e 441 791 em 11:29, contra limiar 11, e o
+  recorte saía vazio.)
 - `experiments/run.py` (com `experimento.recorte`) roda a avaliação sobre o recorte em
   `eval-…/recorte_rajada/` e a validação analítica em `<C3>/recorte_rajada/`.
 - Validação analítica: episódios das classes em `avaliacao.classes_syn_flood` com chave
