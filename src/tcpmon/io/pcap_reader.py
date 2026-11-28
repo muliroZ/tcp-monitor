@@ -18,6 +18,7 @@ import hashlib
 import logging
 import re
 import socket
+import sys
 from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -138,8 +139,8 @@ def _decodificar(buf: bytes, enlace: int, cont: ReadCounters):
             cont.descartados["tcp_truncado_ou_malformado"] += 1
             return None
         try:
-            src = socket.inet_ntop(socket.AF_INET, ip.src)
-            dst = socket.inet_ntop(socket.AF_INET, ip.dst)
+            src = sys.intern(socket.inet_ntop(socket.AF_INET, ip.src))
+            dst = sys.intern(socket.inet_ntop(socket.AF_INET, ip.dst))
         except (ValueError, OSError):
             cont.descartados["ip_malformado"] += 1
             return None
@@ -157,8 +158,8 @@ def _decodificar(buf: bytes, enlace: int, cont: ReadCounters):
                 cont.descartados["nao_tcp"] += 1
             return None
         try:
-            src = socket.inet_ntop(socket.AF_INET6, ip.src)
-            dst = socket.inet_ntop(socket.AF_INET6, ip.dst)
+            src = sys.intern(socket.inet_ntop(socket.AF_INET6, ip.src))
+            dst = sys.intern(socket.inet_ntop(socket.AF_INET6, ip.dst))
         except (ValueError, OSError):
             cont.descartados["ip_malformado"] += 1
             return None
